@@ -63,6 +63,12 @@ interface ViewerConfigPresenter : Presenter {
      * @param brightness new brightness value
      */
     fun onBrightnessChange(brightness: Float)
+
+    /**
+     * User changed instant viewer interactions setting
+     * @param instant is instant viewer interactions enabled
+     */
+    fun onInstantInteractionsChange(instant: Boolean)
 }
 
 class ViewerConfigPresenterImpl(
@@ -173,6 +179,14 @@ class ViewerConfigPresenterImpl(
         currentConfig()?.also {
             if (it.brightness != brightness) {
                 viewModel.saveConfig(it.copy(brightness = brightness))
+            }
+        }
+    }
+
+    override fun onInstantInteractionsChange(instant: Boolean) {
+        currentConfig()?.also {
+            if (it.instantViewerInteractions != instant) {
+                viewModel.saveConfig(it.copy(instantViewerInteractions = instant))
             }
         }
     }

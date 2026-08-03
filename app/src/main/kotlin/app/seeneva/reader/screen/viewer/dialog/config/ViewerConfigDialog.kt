@@ -97,6 +97,10 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
             presenter.onKeepScreenOnChange(isChecked)
         }
 
+        viewBinding.instantInteractionsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            presenter.onInstantInteractionsChange(isChecked)
+        }
+
         viewBinding.ttsSwitch.setOnClickListener { presenter.onTtsChange(viewBinding.ttsSwitch.isChecked) }
 
         viewBinding.brightnessSlider.setLabelFormatter(object : LabelFormatter {
@@ -150,6 +154,8 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
         viewBinding.ttsSwitch.isChecked = config.tts
 
         viewBinding.keepScreenOnSwitch.isChecked = config.keepScreenOn
+
+        viewBinding.instantInteractionsSwitch.isChecked = config.instantViewerInteractions
 
         @SuppressLint("Range")
         if (config.systemBrightness) {

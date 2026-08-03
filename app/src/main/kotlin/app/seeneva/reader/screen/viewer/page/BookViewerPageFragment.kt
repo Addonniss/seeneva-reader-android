@@ -52,6 +52,7 @@ import app.seeneva.reader.databinding.LayoutViewerStatesBinding
 import app.seeneva.reader.di.*
 import app.seeneva.reader.extension.*
 import app.seeneva.reader.logic.entity.Direction
+import app.seeneva.reader.logic.usecase.ViewerConfigUseCase
 import app.seeneva.reader.presenter.PresenterStatefulView
 import app.seeneva.reader.screen.viewer.page.entity.PageObjectDirection
 import com.davemorrissey.labs.subscaleview.ImageViewState
@@ -81,6 +82,8 @@ class BookViewerPageFragment :
     private val presenter by lifecycleScope.autoInit<BookViewerPagePresenter>()
 
     private val callback by lazy { scope.getOrNull<Callback>() }
+
+    private val viewerConfigUseCase by lazy { get<ViewerConfigUseCase>() }
 
     private val viewer by lazy {
         PageViewer(
@@ -216,6 +219,14 @@ class BookViewerPageFragment :
             savedInstanceState?.viewerState,
             savedInstanceState?.isObjectWasVisible ?: false
         )
+
+        //Track instant viewer interactions setting to perform animations instantly
+        viewerConfigUseCase.configFlow()
+            .map { it.instantViewerInteractions }
+            .distinctUntilChanged()
+            .observe(viewLifecycleOwner) { instant ->
+                objectImageHelper.instantInteractions = instant
+            }
 
         presenter.showHelpFlow
             .transformLatest { showHelp ->
@@ -543,10 +554,17 @@ class BookViewerPageFragment :
                         }
 
                         try {
-                            siv.animateScaleAndCenterSuspended(
-                                siv.maxScale,
-                                point.apply { set(objBbox.centerX(), objBbox.centerY()) }
-                            )
+                            if (objectImageHelper.instantInteractions) {
+                                siv.setScaleAndCenter(
+                                    siv.maxScale,
+                                    point.apply { set(objBbox.centerX(), objBbox.centerY()) }
+                                )
+                            } else {
+                                siv.animateScaleAndCenterSuspended(
+                                    siv.maxScale,
+                                    point.apply { set(objBbox.centerX(), objBbox.centerY()) }
+                                )
+                            }
                         } finally {
                             // Cancel tip animation listener
                             tipAnimationListenerJob.cancel()

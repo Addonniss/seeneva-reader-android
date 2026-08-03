@@ -28,6 +28,8 @@ import kotlinx.serialization.Serializable
  * @param keepScreenOn should keep screen ON
  * @param brightness viewer screen brightness
  * @param tts is text-to-speech enabled
+ * @param instantViewerInteractions should viewer interactions be performed instantly
+ * (without animations) instead of animated
  */
 @Serializable
 data class ViewerConfig(
@@ -36,7 +38,9 @@ data class ViewerConfig(
     @SerialName("brightness")
     val brightness: Float = SYSTEM_BRIGHTNESS,
     @SerialName("tts")
-    val tts: Boolean = true
+    val tts: Boolean = true,
+    @SerialName("instant_viewer_interactions")
+    val instantViewerInteractions: Boolean = false
 ) {
     val systemBrightness
         get() = brightness == SYSTEM_BRIGHTNESS

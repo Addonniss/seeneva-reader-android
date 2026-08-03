@@ -154,6 +154,11 @@ class BookViewerActivity :
         )
     }
 
+    /**
+     * If `true` viewer interactions should be performed instantly (without animations)
+     */
+    private var instantViewerInteractions = false
+
     private var viewState by Delegates.observable(ViewState.LOADING) { _, _, newState ->
         invalidateOptionsMenu()
 
@@ -194,7 +199,7 @@ class BookViewerActivity :
             callback = object : BookViewerPreviewAdapter.Callback {
                 override fun onPageClick(pos: Int) {
                     if (viewerPager.currentItem != pos) {
-                        viewerPager.setCurrentItem(pos, true)
+                        viewerPager.setCurrentItem(pos, smoothScroll = !instantViewerInteractions)
                         systemUiManager.showState(SystemUiState.HIDDEN)
                     }
                 }
@@ -447,6 +452,8 @@ class BookViewerActivity :
 
     override fun onConfigChanged(config: ViewerConfig) {
         config.applyToWindow(window)
+
+        instantViewerInteractions = config.instantViewerInteractions
     }
 
     override fun onCoverChanged() {
@@ -470,7 +477,7 @@ class BookViewerActivity :
         }
 
         if (pagePosToShow in 0 until viewerPager.count) {
-            viewerPager.setCurrentItem(pagePosToShow)
+            viewerPager.setCurrentItem(pagePosToShow, smoothScroll = !instantViewerInteractions)
         }
     }
 

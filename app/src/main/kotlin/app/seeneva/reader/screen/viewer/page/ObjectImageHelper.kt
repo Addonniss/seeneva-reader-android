@@ -68,6 +68,12 @@ class ObjectImageHelper(
 
     private val interpolator = FastOutSlowInInterpolator()
 
+    /**
+     * If `true` all balloon show/hide and related zoom operations
+     * will be performed instantly (without animations)
+     */
+    var instantInteractions: Boolean = false
+
     private val context
         get() = scaleImageView.context
 
@@ -132,6 +138,9 @@ class ObjectImageHelper(
     ) {
         check(scaleImageView.isReady) { "Image is not ready" }
 
+        //In instant mode balloon should be shown immediately
+        val animateObject = animate && !instantInteractions
+
         // A little bit hacky, but fast.
         //
         // Without it onCenterChanged can be called after every touch event
@@ -151,8 +160,8 @@ class ObjectImageHelper(
          * Switch one showed object to another with animation
          */
         fun switchObject() {
-            if (objectImageView.isVisible && animate) {
-                onHidingAnimEnd = { showPageObjectInner(objectData, resultScaleXY, animate) }
+            if (objectImageView.isVisible && animateObject) {
+                onHidingAnimEnd = { showPageObjectInner(objectData, resultScaleXY, animateObject) }
 
                 if (animationState != ObjectAnimState.HIDING) {
                     //we need to hide current visible balloon firstly
@@ -173,12 +182,20 @@ class ObjectImageHelper(
                         }.start()
                 }
             } else {
-                showPageObjectInner(objectData, resultScaleXY, animate)
+                //in instant mode there is no need to keep already finished loading task
+                loadingTask?.dispose()
+
+                showPageObjectInner(objectData, resultScaleXY, animateObject)
             }
         }
 
         //We need to reset scale before animate page object
         if (scaleImageView.scale == scaleImageView.minScale) {
+            switchObject()
+        } else if (instantInteractions) {
+            //without it view will have scale != scaleImageView.minScale for some reason
+            scaleImageView.resetScaleAndCenter()
+
             switchObject()
         } else {
             scaleImageView.animateScale(.0f)!!
@@ -237,30 +254,47 @@ class ObjectImageHelper(
 
     private fun startBlowingAnimation() {
         if (objectImageView.isVisible && animationState != ObjectAnimState.HIDING) {
-            ViewCompat.animate(objectImageView)
-                .setDuration(150L)
-                .setInterpolator(interpolator)
-                .scaleX(objectImageView.scaleX * 2.0f)
-                .scaleY(objectImageView.scaleY * 2.0f)
-                .alpha(.0f)
-                .withStartAction { animationState = ObjectAnimState.HIDING }
-                .withEndAction {
-                    animationState = ObjectAnimState.IDLE
+            if (instantInteractions) {
+                //instant mode: hide balloon immediately without blow-out animation
+                loadingTask?.dispose()
 
-                    loadingTask?.dispose()
+                objectImageView.apply {
+                    isGone = true
 
-                    objectImageView.apply {
-                        isGone = true
+                    alpha = 1.0f
 
-                        alpha = 1.0f
+                    scaleX = .0f
+                    scaleY = scaleX
+                }
 
-                        scaleX = .0f
-                        scaleY = scaleX
-                    }
+                onHidingAnimEnd?.invoke()
+                onHidingAnimEnd = null
+            } else {
+                ViewCompat.animate(objectImageView)
+                    .setDuration(150L)
+                    .setInterpolator(interpolator)
+                    .scaleX(objectImageView.scaleX * 2.0f)
+                    .scaleY(objectImageView.scaleY * 2.0f)
+                    .alpha(.0f)
+                    .withStartAction { animationState = ObjectAnimState.HIDING }
+                    .withEndAction {
+                        animationState = ObjectAnimState.IDLE
 
-                    onHidingAnimEnd?.invoke()
-                    onHidingAnimEnd = null
-                }.start()
+                        loadingTask?.dispose()
+
+                        objectImageView.apply {
+                            isGone = true
+
+                            alpha = 1.0f
+
+                            scaleX = .0f
+                            scaleY = scaleX
+                        }
+
+                        onHidingAnimEnd?.invoke()
+                        onHidingAnimEnd = null
+                    }.start()
+            }
         }
     }
 
