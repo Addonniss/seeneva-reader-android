@@ -379,33 +379,3 @@ User testing found that bubbles in the middle of the page could not be selected 
 4. Otherwise → existing reading-order navigation (unchanged).
 
 `onSingleTapUp` (hide-zone event consumption for the library's zoom) is unchanged. Added `ComicPageObjectContainerTest.centerLocatedBubbleIsSelectable` — a center-located bubble is found by the spatial query. The precedence itself is UI orchestration (MotionEvent + `viewToSourceCoord` + gesture detector), so it relies on manual verification; the spatial lookup it depends on is covered by the logic tests.
-
----
-
-## 8. Implemented: RTL reading order fix (Phase 3)
-
-Implemented 2026-08-04 on master. User testing on real RTL (manga) pages showed the speech-bubble reading order was wrong for two-column layouts where the columns start at different vertical positions.
-
-### Root cause
-
-`defaultComparator` sorted by the **top edge first** in BOTH directions; the RTL branch only changed the secondary X comparator. So in RTL, a higher LEFT column/panel was ordered before a LOWER RIGHT column/panel whenever the top difference exceeded the tolerance band (GROUP_MIN_DIFF 80 for in-panel groups, PANEL_MIN_DIFF 160 for fake/real panels).
-
-### Fix
-
-The RTL branch of `defaultComparator` now sorts by X first (right edge, descending) and by top second:
-
-- LTR: top first, then left (unchanged).
-- RTL: right first, then top (right column/panel always precedes the left one, regardless of vertical offset; ties on the right edge fall through to top-to-bottom within the column).
-
-LTR behavior is byte-identical. `GroupObjectComparator` (intra-group) and all thresholds are untouched.
-
-### Tests
-
-`PageObjectHelperTest` (logic, no MockK; uses a test-only runtime shadow of `android.graphics.RectF` provided outside the repo via `/opt/data/tools/test-shadows/rectf-shadow.jar` prepended by the user-space Gradle init script). Focused fixtures: `twoColumnsAlignedLtrAndRtl`, `twoColumnsOffsetNoPanels`, `twoColumnsOffsetInPanel` — desired behavior LTR `A→C→B→D`, RTL `B→D→A→C` (aligned and offset columns, with and without panels). `noPanelsTwoColumnLayoutRtl` also started passing (same root cause).
-
-### Known limitations (intentionally retained, out of Phase 3 scope)
-
-The following LTR fixtures still fail and are retained as documented pre-existing behavior, NOT Phase 3 regressions:
-
-- `noPanelsTwoColumnLayout`, `panelWithTwoColumnLayout` — LTR reads row-band-first when bubbles are separated by > OBJECT_NEIGHBOUR_MIN_DIFF (20px) gaps. On real pages column bubbles are closer (one group) or separated by panels, so LTR is correct there; these fixtures document the large-gap behavior.
-- `panelRaggedTopsShouldNotBreakPanelOrder` — LTR panel order treats side-by-side panels whose top edges differ by < PANEL_MIN_DIFF (160px) as the same row and falls back to X order. Possible future LTR improvement; deliberately not changed because Phase 3 preserves LTR behavior exactly.

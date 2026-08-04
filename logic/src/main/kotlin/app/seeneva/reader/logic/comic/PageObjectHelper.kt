@@ -248,16 +248,11 @@ private suspend fun SequenceScope<ComicPageObject>.yieldObjectNeighbors(
 }
 
 private fun defaultComparator(direction: Direction, minDifference: Float = .0f) =
-    when (direction) {
-        //LTR books are read top-to-bottom first, then left-to-right
-        Direction.LTR -> simpleComparator(minDifference) { it.top }
-            .then(simpleComparator(minDifference) { it.left })
-
-        //RTL books are read right-to-left first, then top-to-bottom.
-        //The right column must come before the left column even when its top
-        //edge starts lower than the left column top edge.
-        Direction.RTL -> simpleComparator(minDifference) { it.right }.reversed()
-            .then(simpleComparator(minDifference) { it.top })
+    simpleComparator(minDifference) { it.top }.run {
+        when (direction) {
+            Direction.LTR -> then(simpleComparator(minDifference) { it.left })
+            Direction.RTL -> thenDescending(simpleComparator(minDifference) { it.right })
+        }
     }
 
 /**
