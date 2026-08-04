@@ -4,8 +4,7 @@
 
 - [x] Instant viewer interactions (implemented as viewer setting "Instant viewer interactions"; replaces "Disable viewer animations" naming)
 - [x] Direct bubble selection
-- [ ] LTR / RTL bubble reading order
-- [x] Bubble size adjustment (viewer setting "Bubble size": percentage slider 100%–250% scaling the enlarged bubble relative to page min scale; manual device verification by the Romanian user)
+- [x] Bubble size adjustment (viewer setting "Bubble size": percentage slider 100%–400% scaling the enlarged bubble relative to page min scale; manual device verification by the Romanian user)
 - [ ] Maximum zoom adjustment
 - [ ] Double-tap page navigation
 - [ ] Alternative thumbnail navigation gesture

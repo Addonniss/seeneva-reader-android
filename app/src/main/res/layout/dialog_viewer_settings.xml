@@ -94,7 +94,7 @@
             android:minHeight="48dp"
             android:stepSize="0.1"
             android:valueFrom="1.0"
-            android:valueTo="2.5" />
+            android:valueTo="4.0" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
