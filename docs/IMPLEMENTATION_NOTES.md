@@ -330,3 +330,41 @@ Implemented 2026-08-03 on master. Adds a viewer setting **"Instant viewer intera
 ### Known limitation
 
 - The setting does not affect the physical swipe animation inside ViewPager2 (that is the user's own gesture and ViewPager2 is final, so it cannot be disabled without hacks/reflection). All application-initiated transitions are instant.
+
+---
+
+## 7. Implemented: Direct bubble selection (Phase 1, item 2)
+
+Implemented 2026-08-03 on master. Tap directly on a detected speech bubble → that exact bubble is enlarged (spatial selection), instead of advancing to the next bubble in reading order.
+
+### Behavior
+
+- **Tap inside a detected speech bubble** → `viewToSourceCoord(e.x, e.y)` → `presenter.onPageTap(x, y)` → `ComicPageObjectContainer.indexOf(x, y)` (RTree point query, same infrastructure as long-press) → `showPageObject(SelectedPageObject)` + same haptic feedback as reading-order selection. `readObjectPosition` is set to the tapped bubble, so subsequent forward/backward taps continue from it.
+- **Tap outside all bubbles** → previous behavior exactly (reading-order navigation by tap side, LTR/RTL aware; center-strip hide-zone check still runs first).
+- **Untouched**: reading-order algorithm, bubble scale, long-press OCR/TTS, LTR/RTL, page navigation, Instant viewer interactions setting (bubble show/hide still respects it), bubble detection.
+
+### Architectural changes
+
+- `ComicPageObjectContainer.indexOf(x, y): Int?` (logic) — RTree-backed spatial lookup that returns the object index instead of the object; delegates to the existing `get(x, y)` so overlap resolution is exactly the existing RTree search order (`firstOrNull`), identical to the long-press path.
+- `BookViewerPagePresenter.onPageTap(x, y): SelectedPageObject?` (app) — wires `indexOf` → `intoSelectedPageObject`, updates `readObjectPosition`.
+- `BookViewerPageFragment.onSingleTapConfirmed` — new precedence: hide-zone → direct bubble selection → reading-order fallback.
+
+### Tests
+
+- New `logic` unit test `ComicPageObjectContainerTest` (4 tests, no MockK): tap inside bubble A → A; tap inside bubble B → B; tap in gap → null; overlapping bubbles → deterministic + consistent with RTree `get(x,y)` order.
+- Note: `android.graphics.RectF` constructors are stubbed in the mockable android.jar, so the test allocates `RectF` via `sun.misc.Unsafe.allocateInstance` + public-field assignment; the test JVM gets `--add-opens=java.base/sun.misc=ALL-UNNAMED` from a user-space `~/.gradle/init.gradle` (outside the repo). This exercises the real RTree container on a plain JVM.
+
+### Known limitation
+
+- `indexOf(x, y)` returns the first object of ANY class containing the point (same rule as the existing long-press). If a page has PANEL objects that overlap a bubble, the tap could select the panel. No class filter was added to stay consistent with the existing RTree behavior; revisit if panel detection ships and this becomes user-visible.
+
+### Correction (2026-08-03): center hide-zone no longer shadows direct bubble selection
+
+User testing found that bubbles in the middle of the page could not be selected — the center hide-zone check ran first, so tapping the middle hid/shrunk the current bubble instead of selecting. Fixed the tap precedence in `BookViewerPageFragment.onSingleTapConfirmed`:
+
+1. Convert tap to source coordinates.
+2. Inside a detected bubble (`presenter.onPageTap` → RTree `indexOf`) → select/enlarge that exact bubble (wins over the hide-zone).
+3. Not inside a bubble but in the center hide-zone → hide current bubble (unchanged behavior).
+4. Otherwise → existing reading-order navigation (unchanged).
+
+`onSingleTapUp` (hide-zone event consumption for the library's zoom) is unchanged. Added `ComicPageObjectContainerTest.centerLocatedBubbleIsSelectable` — a center-located bubble is found by the spatial query. The precedence itself is UI orchestration (MotionEvent + `viewToSourceCoord` + gesture detector), so it relies on manual verification; the spatial lookup it depends on is covered by the logic tests.

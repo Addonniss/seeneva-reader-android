@@ -129,7 +129,24 @@ class BookViewerPageFragment :
             private val rect = Rect()
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                if (isHideObjectBalloonTap(e)) {
+                // Try to directly select a speech bubble which contains the tap point.
+                // This takes precedence over the center hide-zone so bubbles located
+                // in the middle of the page can be selected too.
+                val tappedObject = viewBinding.scaleImageView
+                    .viewToSourceCoord(e.x, e.y, point)
+                    ?.let { (x, y) -> presenter.onPageTap(x, y) }
+
+                if (tappedObject != null) {
+                    objectImageHelper.showPageObject(tappedObject)
+
+                    requireView().performHapticFeedback(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            HapticFeedbackConstants.VIRTUAL_KEY_RELEASE
+                        } else {
+                            HapticFeedbackConstants.VIRTUAL_KEY
+                        }
+                    )
+                } else if (isHideObjectBalloonTap(e)) {
                     //this is a zone to hide object
                     hideCurrentPageObject()
                 } else {

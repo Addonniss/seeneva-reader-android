@@ -3,7 +3,7 @@
 ## Phase 1 — Viewer UX
 
 - [x] Instant viewer interactions (implemented as viewer setting "Instant viewer interactions"; replaces "Disable viewer animations" naming)
-- [ ] Direct bubble selection
+- [x] Direct bubble selection
 - [ ] LTR / RTL bubble reading order
 - [ ] Bubble size adjustment
 - [ ] Maximum zoom adjustment

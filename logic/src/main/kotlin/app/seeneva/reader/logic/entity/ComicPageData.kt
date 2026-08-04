@@ -79,6 +79,19 @@ data class ComicPageObjectContainer(
         objectsRTree.search(Geometries.point(x, y))
             .asSequence()
             .map { it.value() }
+
+    /**
+     * Find index of a page object which contains provided point (x, y)
+     *
+     * It is a direct spatial selection: exactly the object located under the point
+     * will be found, not the next object in the reading order.
+     *
+     * @param x X coordinate
+     * @param y Y coordinate
+     * @return index of the found object or null if no object contains the provided point
+     */
+    fun indexOf(x: Float, y: Float): Int? =
+        get(x, y).firstOrNull()?.let { found -> objects.indexOf(found) }
 }
 
 /**

@@ -74,6 +74,18 @@ interface BookViewerPagePresenter : Presenter {
     fun currentPageObject(): SelectedPageObject?
 
     /**
+     * Select a page object which contains provided source coordinates (if any).
+     *
+     * It is a direct spatial selection: exactly the object located under the point
+     * will be selected, not the next object in the reading order.
+     *
+     * @param x source X coordinate
+     * @param y source Y coordinate
+     * @return selected page object or null if there is no page object at the point
+     */
+    fun onPageTap(x: Float, y: Float): SelectedPageObject?
+
+    /**
      * Reset currently read page object position
      */
     fun resetReadPageObject()
@@ -221,6 +233,16 @@ class BookViewerPagePresenterImpl(
 
     override fun currentPageObject() =
         requirePageData().intoSelectedPageObject(readObjectPosition)
+
+    override fun onPageTap(x: Float, y: Float): SelectedPageObject? =
+        requirePageData().let { page ->
+            if (page.objects.isEmpty()) {
+                null
+            } else {
+                page.objects.indexOf(x, y)?.also { readObjectPosition = it }
+                    ?.let { page.intoSelectedPageObject(it) }
+            }
+        }
 
     override fun resetReadPageObject() {
         readObjectPosition = -1
