@@ -4,7 +4,7 @@
 
 - [x] Instant viewer interactions (implemented as viewer setting "Instant viewer interactions"; replaces "Disable viewer animations" naming)
 - [x] Direct bubble selection
-- [ ] LTR / RTL bubble reading order
+- [x] LTR / RTL bubble reading order (Phase 3: fixed RTL reading order for offset columns — right column/panel now precedes the left one regardless of vertical starting position; LTR behavior preserved exactly; tested with aligned and vertically offset RTL columns, with and without panels; manually verified on the physical device by the Romanian user)
 - [ ] Bubble size adjustment
 - [ ] Maximum zoom adjustment
 - [ ] Double-tap page navigation
@@ -24,6 +24,6 @@
 
 ## Engineering
 
-- [ ] Add tests for reading order
+- [x] Add tests for reading order (logic module `PageObjectHelperTest` — synthetic LTR/RTL fixtures; known pre-existing LTR limitation fixtures documented separately in IMPLEMENTATION_NOTES)
 - [ ] Add tests for new viewer behavior
 - [ ] Manual test on physical Android device
