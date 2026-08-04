@@ -275,7 +275,11 @@ class BookViewerActivity :
         override fun onPageSelected(position: Int) {
             super.onPageSelected(position)
             //move preview pages to the current selected page
-            viewBinding.pagesPreviewList.smoothScrollToPosition(position)
+            if (instantViewerInteractions) {
+                viewBinding.pagesPreviewList.scrollToPosition(position)
+            } else {
+                viewBinding.pagesPreviewList.smoothScrollToPosition(position)
+            }
 
             pagesPreviewAdapter.selectedPage = position
 
@@ -454,6 +458,8 @@ class BookViewerActivity :
         config.applyToWindow(window)
 
         instantViewerInteractions = config.instantViewerInteractions
+
+        viewerPager.instantPageTurns = config.instantViewerInteractions
     }
 
     override fun onCoverChanged() {

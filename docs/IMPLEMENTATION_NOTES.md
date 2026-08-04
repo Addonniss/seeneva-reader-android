@@ -331,6 +331,17 @@ Implemented 2026-08-03 on master. Adds a viewer setting **"Instant viewer intera
 
 - The setting does not affect the physical swipe animation inside ViewPager2 (that is the user's own gesture and ViewPager2 is final, so it cannot be disabled without hacks/reflection). All application-initiated transitions are instant.
 
+### Follow-up correction (2026-08-03): user-initiated page swipes are instant too
+
+User testing found the page-turn animation was still present for user swipes. Extended the setting to user-initiated page turns:
+
+- `ViewerPager.instantPageTurns` (new) — when ON, a touch listener on the pager's internal RecyclerView intercepts horizontal swipes: the page does NOT slide with the finger, and on release the target page is set via `pager.setCurrentItem(target, false)` (posted after the touch dispatch, since calling it inside the dispatch is unsafe — the existing fling code has the same caveat).
+- The target is computed in physical pager coordinates by the pure helper `ViewerPager.instantPageTurnTarget(currentItem, itemCount, dx, width, thresholdFraction)` (swipe must cover ≥ 25% of the pager width; clamped to valid range). Physical-space math keeps the RTL position reversal semantics identical to the animated pager.
+- Zoomed-image panning is unaffected: the page's image view consumes the gesture first (child dispatch), so the listener only sees drags the image view did not consume. `ACTION_DOWN` may be consumed by the image view, so the listener tracks the swipe from the first event the RecyclerView receives.
+- Thumbnail strip: `pagesPreviewList.smoothScrollToPosition` in `onPageSelected` is now `scrollToPosition` (instant) when the setting is ON. The existing slow-fling snap-back never fires in instant mode because the swipe is fully consumed.
+- Wired from `BookViewerActivity.onConfigChanged` (same place as the Phase 1 flag).
+- New unit tests: `ViewerPagerTest` (6, app module, no MockK) covering swipe-left/right, short swipe, first/last page clamps, empty pager.
+
 ---
 
 ## 7. Implemented: Direct bubble selection (Phase 1, item 2)

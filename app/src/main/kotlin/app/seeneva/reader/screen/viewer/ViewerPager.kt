@@ -20,6 +20,8 @@ package app.seeneva.reader.screen.viewer
 
 import android.app.ActivityManager
 import android.os.Build
+import android.view.MotionEvent
+import android.view.View
 import androidx.core.app.ActivityManagerCompat
 import androidx.core.content.getSystemService
 import androidx.recyclerview.widget.RecyclerView
@@ -57,6 +59,17 @@ class ViewerPager(
         hashMapOf<ViewPager2.OnPageChangeCallback, ViewPager2.OnPageChangeCallback>()
 
     private val pagerRecyclerView by lazy { pager.recyclerView }
+
+    /**
+     * If `true` user initiated page turns (horizontal swipes) are performed instantly:
+     * the page does not slide with the finger and the target page is set immediately
+     * on release, without any page sliding animation
+     */
+    var instantPageTurns: Boolean by Delegates.observable(false) { _, old, new ->
+        if (old != new) {
+            pagerRecyclerView.setOnTouchListener(if (new) instantSwipeTouchListener else null)
+        }
+    }
 
     private val reversePage = { count: Int, pos: Int ->
         if (count == 0) {
@@ -121,6 +134,67 @@ class ViewerPager(
                 // otherwise pass arguments to SnapHelper's onFlingListener
                 return snapFlingListener?.onFling(velocityX, velocityY) ?: false
             }
+        }
+    }
+
+    /**
+     * Touch listener which intercepts horizontal swipes on the pager to perform
+     * instant page turns.
+     *
+     * `ACTION_DOWN` can be consumed by the page's own image view (e.g. zoomed image
+     * panning), so the gesture is tracked from the first event the pager's RecyclerView
+     * receives.
+     */
+    private val instantSwipeTouchListener = object : View.OnTouchListener {
+        private var downX = Float.NaN
+
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = e.x
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    if (downX.isNaN()) {
+                        // The page image view consumed ACTION_DOWN and the RecyclerView
+                        // took over the gesture. Track the swipe from here.
+                        downX = e.x
+                    }
+
+                    // Consume the gesture so the pager does not slide with the finger
+                    return true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    if (!downX.isNaN()) {
+                        val dx = e.x - downX
+
+                        instantPageTurnTarget(
+                            currentItem = pager.currentItem,
+                            itemCount = adapter.itemCount,
+                            dx = dx,
+                            width = pager.width,
+                            thresholdFraction = INSTANT_PAGE_TURN_THRESHOLD
+                        )?.also { target ->
+                            // ViewPager2.setCurrentItem is unsafe inside the touch dispatch,
+                            // so apply the page jump after the event is fully processed
+                            v.post { pager.setCurrentItem(target, false) }
+                        }
+
+                        downX = Float.NaN
+                    }
+
+                    return true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    downX = Float.NaN
+
+                    return true
+                }
+            }
+
+            return false
         }
     }
 
@@ -228,4 +302,39 @@ class ViewerPager(
      */
     private val Iterable<ComicBookPage>.bytes
         get() = fold(0L) { acc, page -> acc.plus(page.bytes) }
+
+    companion object {
+        /**
+         * Fraction of the pager width a horizontal swipe must cover to turn the page
+         * in instant mode
+         */
+        private const val INSTANT_PAGE_TURN_THRESHOLD = 0.25f
+
+        /**
+         * Compute the target physical page position for an instant page turn.
+         *
+         * Works in physical pager coordinates (the same space [ViewPager2] uses), so
+         * the RTL position reversal stays consistent with the animated behavior.
+         *
+         * @param currentItem current physical page position
+         * @param itemCount total pages count
+         * @param dx horizontal swipe distance in pixels (negative = swipe left)
+         * @param width pager width in pixels
+         * @param thresholdFraction fraction of [width] the swipe must cover to turn the page
+         * @return target physical page position or null if no page change should happen
+         */
+        internal fun instantPageTurnTarget(
+            currentItem: Int,
+            itemCount: Int,
+            dx: Float,
+            width: Int,
+            thresholdFraction: Float
+        ): Int? {
+            if (itemCount <= 0 || width <= 0 || abs(dx) < width * thresholdFraction) {
+                return null
+            }
+
+            return (currentItem + if (dx < 0) 1 else -1).coerceIn(0, itemCount - 1)
+        }
+    }
 }
