@@ -35,7 +35,6 @@
     <dimen name="viewer_fling_velocity">450dp</dimen>
 
     <dimen name="viewer_balloon_elevation">8dp</dimen>
-    <dimen name="viewer_balloon_scale_xy">0.5dp</dimen>
 
     <dimen name="viewer_help_padding">8dp</dimen>
 </resources>

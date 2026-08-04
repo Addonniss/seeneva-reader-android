@@ -52,6 +52,7 @@ import org.koin.core.scope.inject
 import org.tinylog.kotlin.Logger
 import java.text.Format
 import java.text.NumberFormat
+import kotlin.math.roundToInt
 
 interface ViewerConfigView : PresenterView {
     /**
@@ -69,6 +70,11 @@ interface ViewerConfigView : PresenterView {
      * @param brightness brightness to show
      */
     fun showBrightness(@FloatRange(from = .0, to = 1.0) brightness: Float)
+
+    /**
+     * @param scale bubble scale multiplier to show
+     */
+    fun showBubbleScale(scale: Float)
 }
 
 class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeComponent {
@@ -121,6 +127,23 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
             viewBinding.brightnessSlider.userProgress().collect { presenter.onBrightnessChange(it) }
         }
 
+        viewBinding.bubbleScaleSlider.setLabelFormatter(object : LabelFormatter {
+            private val formatter: Format =
+                NumberFormat.getPercentInstance()
+                    .apply { maximumFractionDigits = 1 }
+
+            override fun getFormattedValue(value: Float) =
+                formatter.format(value)
+        })
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewBinding.bubbleScaleSlider.userProgress().collect { scale ->
+                showBubbleScale(scale)
+
+                presenter.onBubbleScaleChange(scale)
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             presenter.changeTtsEvents.collect {
                 when (it) {
@@ -157,6 +180,8 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
 
         viewBinding.instantInteractionsSwitch.isChecked = config.instantViewerInteractions
 
+        showBubbleScale(config.bubbleScale)
+
         @SuppressLint("Range")
         if (config.systemBrightness) {
             viewBinding.systemBrightnessSwitch.isChecked = true
@@ -177,6 +202,16 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
                 Logger.debug { "Actual brightness is $it" }
             }
         }
+    }
+
+    override fun showBubbleScale(scale: Float) {
+        viewBinding.bubbleScaleSlider.value = scale.coerceIn(
+            viewBinding.bubbleScaleSlider.valueFrom,
+            viewBinding.bubbleScaleSlider.valueTo
+        )
+
+        viewBinding.bubbleScaleLabel.text =
+            getString(R.string.viewer_settings_bubble_scale_value, (scale * 100).roundToInt())
     }
 
     private fun enableView(view: View, enable: Boolean = true) {

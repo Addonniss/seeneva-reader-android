@@ -237,12 +237,13 @@ class BookViewerPageFragment :
             savedInstanceState?.isObjectWasVisible ?: false
         )
 
-        //Track instant viewer interactions setting to perform animations instantly
+        //Track viewer settings relevant to the page object helper
         viewerConfigUseCase.configFlow()
-            .map { it.instantViewerInteractions }
+            .map { it.instantViewerInteractions to it.bubbleScale }
             .distinctUntilChanged()
-            .observe(viewLifecycleOwner) { instant ->
+            .observe(viewLifecycleOwner) { (instant, bubbleScale) ->
                 objectImageHelper.instantInteractions = instant
+                objectImageHelper.bubbleScale = bubbleScale
             }
 
         presenter.showHelpFlow

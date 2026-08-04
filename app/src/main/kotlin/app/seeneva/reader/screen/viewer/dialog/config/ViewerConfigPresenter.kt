@@ -69,6 +69,12 @@ interface ViewerConfigPresenter : Presenter {
      * @param instant is instant viewer interactions enabled
      */
     fun onInstantInteractionsChange(instant: Boolean)
+
+    /**
+     * User changed bubble size setting
+     * @param scale bubble size multiplier
+     */
+    fun onBubbleScaleChange(scale: Float)
 }
 
 class ViewerConfigPresenterImpl(
@@ -187,6 +193,14 @@ class ViewerConfigPresenterImpl(
         currentConfig()?.also {
             if (it.instantViewerInteractions != instant) {
                 viewModel.saveConfig(it.copy(instantViewerInteractions = instant))
+            }
+        }
+    }
+
+    override fun onBubbleScaleChange(scale: Float) {
+        currentConfig()?.also {
+            if (it.bubbleScale != scale) {
+                viewModel.saveConfig(it.copy(bubbleScale = scale))
             }
         }
     }

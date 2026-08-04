@@ -22,6 +22,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -52,5 +53,30 @@ class ViewerConfigTest {
         val decoded = json.decodeFromString<ViewerConfig>(json.encodeToString(config))
 
         assertTrue(decoded.instantViewerInteractions)
+    }
+
+    @Test
+    fun bubbleScaleDefaultsToOne() {
+        //Default value must preserve current Seeneva behavior (bubble shown at on-page size)
+        assertEquals(1.0f, ViewerConfig().bubbleScale)
+    }
+
+    @Test
+    fun oldStoredConfigWithoutBubbleScaleDecodesToOne() {
+        //Simulate a viewer config saved before "bubble size" setting existed
+        val oldConfig = """{"keep_screen_on":true,"brightness":-1.0,"tts":true}"""
+
+        val decoded = json.decodeFromString<ViewerConfig>(oldConfig)
+
+        assertEquals(1.0f, decoded.bubbleScale)
+    }
+
+    @Test
+    fun bubbleScaleRoundTrip() {
+        val config = ViewerConfig(bubbleScale = 1.5f)
+
+        val decoded = json.decodeFromString<ViewerConfig>(json.encodeToString(config))
+
+        assertEquals(1.5f, decoded.bubbleScale)
     }
 }

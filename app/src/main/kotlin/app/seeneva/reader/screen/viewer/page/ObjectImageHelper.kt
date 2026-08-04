@@ -74,6 +74,12 @@ class ObjectImageHelper(
      */
     var instantInteractions: Boolean = false
 
+    /**
+     * Bubble size multiplier relative to the page min scale
+     * (1.0f means the bubble is displayed at its on-page size)
+     */
+    var bubbleScale: Float = 1.0f
+
     private val context
         get() = scaleImageView.context
 
@@ -127,13 +133,10 @@ class ObjectImageHelper(
     /**
      * Show object on the page
      * @param objectData single comic book page object data
-     * @param scaleXY will be applied to object image.
-     * Can be less than required in case if scaled balloon will be outside of visible area
      * @param animate is page object should be showed using animation
      */
     fun showPageObject(
         objectData: SelectedPageObject,
-        scaleXY: Float = context.resources.getDimension(R.dimen.viewer_balloon_scale_xy),
         animate: Boolean = true
     ) {
         check(scaleImageView.isReady) { "Image is not ready" }
@@ -154,7 +157,7 @@ class ObjectImageHelper(
             scaleImageView.addOnStateChangedListener(scaleViewStateListener)
         }
 
-        val resultScaleXY = scaleImageView.minScale + scaleXY
+        val resultScaleXY = scaleImageView.minScale * bubbleScale
 
         /**
          * Switch one showed object to another with animation

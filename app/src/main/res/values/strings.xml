@@ -123,6 +123,8 @@
     <string name="viewer_settings_system_brightness">System brightness</string>
     <string name="viewer_settings_tts">Text-to-speech (English only)</string>
     <string name="viewer_settings_instant_interactions">Instant viewer interactions</string>
+    <string name="viewer_settings_bubble_scale">Bubble size</string>
+    <string name="viewer_settings_bubble_scale_value">Bubble size: %1$d%%</string>
     <string name="viewer_tts_error_title">TTS not available</string>
     <string name="viewer_tts_error_not_installed">Please install any available text-to-speech engine on the device and configure \‘%1$s\’ language.</string>
     <string name="viewer_tts_error_language">Please install \‘%1$s\’ language for the selected TTS engine.</string>

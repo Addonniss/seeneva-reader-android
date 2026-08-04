@@ -40,7 +40,9 @@ data class ViewerConfig(
     @SerialName("tts")
     val tts: Boolean = true,
     @SerialName("instant_viewer_interactions")
-    val instantViewerInteractions: Boolean = false
+    val instantViewerInteractions: Boolean = false,
+    @SerialName("bubble_scale")
+    val bubbleScale: Float = 1.0f
 ) {
     val systemBrightness
         get() = brightness == SYSTEM_BRIGHTNESS
