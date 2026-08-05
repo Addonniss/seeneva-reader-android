@@ -48,9 +48,11 @@ import app.seeneva.reader.databinding.LayoutViewerStatesBinding
 import app.seeneva.reader.di.*
 import app.seeneva.reader.extension.observe
 import app.seeneva.reader.extension.waitLayout
+import app.seeneva.reader.gesture.TwoFingerDoubleTapDetector
 import app.seeneva.reader.logic.entity.ComicBookDescription
 import app.seeneva.reader.logic.entity.Direction
 import app.seeneva.reader.logic.entity.configuration.ViewerConfig
+import app.seeneva.reader.logic.entity.configuration.ViewerGestureAction
 import app.seeneva.reader.logic.entity.configuration.applyToWindow
 import app.seeneva.reader.presenter.PresenterStatefulView
 import app.seeneva.reader.screen.viewer.dialog.config.ViewerConfigDialog
@@ -159,6 +161,33 @@ class BookViewerActivity :
      */
     private var instantViewerInteractions = false
 
+    /**
+     * Action assigned to the "bottom swipe up" gesture
+     */
+    private var bottomSwipeUpAction: ViewerGestureAction = ViewerGestureAction.NONE
+
+    /**
+     * Action assigned to the "two-finger double-tap at bottom" gesture
+     */
+    private var twoFingerTapBottomAction: ViewerGestureAction =
+        ViewerGestureAction.THUMBNAIL_NAVIGATION
+
+    /**
+     * Action assigned to the "two-finger double-tap at top" gesture
+     */
+    private var twoFingerTapTopAction: ViewerGestureAction = ViewerGestureAction.SETTINGS
+
+    private val twoFingerDoubleTapDetector by lazy { TwoFingerDoubleTapDetector() }
+
+    /**
+     * True when the app UI (toolbar, thumbnail navigation, grey-out) should be visible.
+     *
+     * The app UI is decoupled from the Android system bar state: an OS-initiated bars
+     * reveal (e.g. a bottom edge swipe in immersive mode) must not show the thumbnail
+     * navigation unless the "bottom swipe up" gesture is mapped to it.
+     */
+    private var appUiVisible = false
+
     private var viewState by Delegates.observable(ViewState.LOADING) { _, _, newState ->
         invalidateOptionsMenu()
 
@@ -185,6 +214,9 @@ class BookViewerActivity :
                     progressBar.isGone = true
                     errorLayout.isGone = false
                 }
+
+                //Show the app UI (toolbar) together with the system bars
+                appUiVisible = true
 
                 systemUiManager.showState(SystemUiState.SHOWED)
             }
@@ -262,6 +294,17 @@ class BookViewerActivity :
                         systemUiManager.holdShown()
                     }
 
+                    //Configurable "swipe up from the bottom" gesture.
+                    //Works in the normal reading state (system UI hidden)
+                    if (bottomSwipeUpAction != ViewerGestureAction.NONE &&
+                        viewState == ViewState.LOADED &&
+                        systemUiManager.stateFlow.value == SystemUiState.HIDDEN &&
+                        velocityY < -swipeUpVelocityThreshold &&
+                        e1.y > screenHeightPx / 2f
+                    ) {
+                        dispatchGestureAction(bottomSwipeUpAction)
+                    }
+
                     return super.onFling(e1, e2, velocityX, velocityY)
                 }
 
@@ -307,6 +350,31 @@ class BookViewerActivity :
             // On Android 9 dispatchTouchEvent can be called after the Activity was closed
             // https://github.com/Seeneva/seeneva-reader-android/issues/24
             gestureDetector.onTouchEvent(ev)
+
+            val twoFingerFired = twoFingerDoubleTapDetector.onEvent(
+                action = ev.actionMasked,
+                pointerCount = ev.pointerCount,
+                centroidX = ev.centroidX(),
+                centroidY = ev.centroidY(),
+                eventTime = ev.eventTime
+            )
+
+            if (twoFingerFired) {
+                //Top/bottom zones are direction independent
+                val action = if (twoFingerDoubleTapDetector.firedTapY < screenHeightPx / 2f) {
+                    twoFingerTapTopAction
+                } else {
+                    twoFingerTapBottomAction
+                }
+
+                dispatchGestureAction(action)
+            }
+
+            //Consume the second tap of a two-finger double-tap so the page
+            //does not react to it
+            if (twoFingerFired || twoFingerDoubleTapDetector.isSecondTapInProgress) {
+                return true
+            }
         }
         return super.dispatchTouchEvent(ev)
     }
@@ -358,9 +426,30 @@ class BookViewerActivity :
         systemUiManager.stateFlow
             .shouldAnimate()
             .observe(this) { (state, animate) ->
-                uiAnimator.showState(state, animate)
+                //An OS-initiated system bars reveal (e.g. a bottom edge swipe in
+                //immersive mode) must not show the app UI unless the "bottom swipe up"
+                //gesture is mapped to Thumbnail Navigation
+                if (state == SystemUiState.SHOWED &&
+                    !appUiVisible &&
+                    bottomSwipeUpAction == ViewerGestureAction.THUMBNAIL_NAVIGATION
+                ) {
+                    appUiVisible = true
+                }
 
-                viewBinding.pagesPager.isUserInputEnabled = state == SystemUiState.HIDDEN
+                if (state == SystemUiState.HIDDEN) {
+                    appUiVisible = false
+                }
+
+                val appUiState =
+                    if (appUiVisible && state == SystemUiState.SHOWED) {
+                        SystemUiState.SHOWED
+                    } else {
+                        SystemUiState.HIDDEN
+                    }
+
+                uiAnimator.showState(appUiState, animate)
+
+                viewBinding.pagesPager.isUserInputEnabled = appUiState == SystemUiState.HIDDEN
             }
 
         with(viewBinding.pagesPreviewList) {
@@ -460,6 +549,12 @@ class BookViewerActivity :
         instantViewerInteractions = config.instantViewerInteractions
 
         viewerPager.instantPageTurns = config.instantViewerInteractions
+
+        bottomSwipeUpAction = config.bottomSwipeUpAction
+
+        twoFingerTapBottomAction = config.twoFingerTapBottomAction
+
+        twoFingerTapTopAction = config.twoFingerTapTopAction
     }
 
     override fun onCoverChanged() {
@@ -506,6 +601,62 @@ class BookViewerActivity :
         if (supportFragmentManager.findFragmentByTag(TAG_SETTINGS) == null) {
             ViewerConfigDialog.newInstance().show(supportFragmentManager, TAG_SETTINGS)
         }
+    }
+
+    /**
+     * Perform the action assigned to a gesture
+     * @param action gesture action
+     */
+    private fun dispatchGestureAction(action: ViewerGestureAction) {
+        when (action) {
+            ViewerGestureAction.NONE -> Unit
+
+            ViewerGestureAction.THUMBNAIL_NAVIGATION -> {
+                appUiVisible = true
+
+                systemUiManager.showState(SystemUiState.SHOWED)
+            }
+
+            ViewerGestureAction.SETTINGS -> showSettings()
+        }
+    }
+
+    /**
+     * Screen height in pixels used to split gestures into top/bottom zones
+     */
+    private val screenHeightPx
+        get() = resources.displayMetrics.heightPixels
+
+    /**
+     * Minimal upward fling velocity to consider the "swipe up from the bottom" gesture
+     */
+    private val swipeUpVelocityThreshold
+        get() = ViewConfiguration.get(this).scaledMinimumFlingVelocity.toFloat() * 2f
+
+    /**
+     * Average X of all pointers of the event
+     */
+    private fun MotionEvent.centroidX(): Float {
+        var sum = 0f
+
+        for (i in 0 until pointerCount) {
+            sum += getX(i)
+        }
+
+        return sum / pointerCount
+    }
+
+    /**
+     * Average Y of all pointers of the event
+     */
+    private fun MotionEvent.centroidY(): Float {
+        var sum = 0f
+
+        for (i in 0 until pointerCount) {
+            sum += getY(i)
+        }
+
+        return sum / pointerCount
     }
 
     private fun requireActionBar(): ActionBar =

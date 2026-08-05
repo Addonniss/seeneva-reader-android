@@ -21,6 +21,7 @@ package app.seeneva.reader.screen.viewer.dialog.config
 import app.seeneva.reader.common.coroutines.Dispatchers
 import app.seeneva.reader.extension.observe
 import app.seeneva.reader.logic.entity.configuration.ViewerConfig
+import app.seeneva.reader.logic.entity.configuration.ViewerGestureAction
 import app.seeneva.reader.logic.text.tts.TTS
 import app.seeneva.reader.presenter.BasePresenter
 import app.seeneva.reader.presenter.Presenter
@@ -87,6 +88,24 @@ interface ViewerConfigPresenter : Presenter {
      * @param enabled is double tap page navigation enabled
      */
     fun onDoubleTapPageNavChange(enabled: Boolean)
+
+    /**
+     * User changed the "bottom swipe up" gesture action
+     * @param action gesture action
+     */
+    fun onBottomSwipeUpActionChange(action: ViewerGestureAction)
+
+    /**
+     * User changed the "two-finger double-tap at bottom" gesture action
+     * @param action gesture action
+     */
+    fun onTwoFingerTapBottomActionChange(action: ViewerGestureAction)
+
+    /**
+     * User changed the "two-finger double-tap at top" gesture action
+     * @param action gesture action
+     */
+    fun onTwoFingerTapTopActionChange(action: ViewerGestureAction)
 }
 
 class ViewerConfigPresenterImpl(
@@ -229,6 +248,30 @@ class ViewerConfigPresenterImpl(
         currentConfig()?.also {
             if (it.doubleTapPageNav != enabled) {
                 viewModel.saveConfig(it.copy(doubleTapPageNav = enabled))
+            }
+        }
+    }
+
+    override fun onBottomSwipeUpActionChange(action: ViewerGestureAction) {
+        currentConfig()?.also {
+            if (it.bottomSwipeUpAction != action) {
+                viewModel.saveConfig(it.copy(bottomSwipeUpAction = action))
+            }
+        }
+    }
+
+    override fun onTwoFingerTapBottomActionChange(action: ViewerGestureAction) {
+        currentConfig()?.also {
+            if (it.twoFingerTapBottomAction != action) {
+                viewModel.saveConfig(it.copy(twoFingerTapBottomAction = action))
+            }
+        }
+    }
+
+    override fun onTwoFingerTapTopActionChange(action: ViewerGestureAction) {
+        currentConfig()?.also {
+            if (it.twoFingerTapTopAction != action) {
+                viewModel.saveConfig(it.copy(twoFingerTapTopAction = action))
             }
         }
     }

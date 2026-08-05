@@ -24,6 +24,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import androidx.annotation.FloatRange
 import androidx.core.view.forEach
 import androidx.lifecycle.lifecycleScope
@@ -36,6 +39,7 @@ import app.seeneva.reader.di.getValue
 import app.seeneva.reader.di.koinLifecycleScope
 import app.seeneva.reader.di.requireActivityScope
 import app.seeneva.reader.logic.entity.configuration.ViewerConfig
+import app.seeneva.reader.logic.entity.configuration.ViewerGestureAction
 import app.seeneva.reader.logic.text.Language
 import app.seeneva.reader.logic.text.tts.TTS
 import app.seeneva.reader.logic.text.tts.TTSErrorResolver
@@ -174,6 +178,29 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
             }
         }
 
+        //Configurable gestures. Selection events are suppressed until the saved
+        //config is applied by [showConfig]
+        val gestureActionItems = listOf(
+            getString(R.string.viewer_settings_gesture_action_none),
+            getString(R.string.viewer_settings_gesture_action_thumbnails),
+            getString(R.string.viewer_settings_gesture_action_settings)
+        )
+
+        setupGestureSpinner(
+            viewBinding.bottomSwipeUpActionSpinner,
+            gestureActionItems
+        ) { action -> presenter.onBottomSwipeUpActionChange(action) }
+
+        setupGestureSpinner(
+            viewBinding.twoFingerTapBottomActionSpinner,
+            gestureActionItems
+        ) { action -> presenter.onTwoFingerTapBottomActionChange(action) }
+
+        setupGestureSpinner(
+            viewBinding.twoFingerTapTopActionSpinner,
+            gestureActionItems
+        ) { action -> presenter.onTwoFingerTapTopActionChange(action) }
+
         viewLifecycleOwner.lifecycleScope.launch {
             presenter.changeTtsEvents.collect {
                 when (it) {
@@ -211,6 +238,17 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
         viewBinding.instantInteractionsSwitch.isChecked = config.instantViewerInteractions
 
         viewBinding.doubleTapPageNavSwitch.isChecked = config.doubleTapPageNav
+
+        //Apply saved gesture assignments without saving them back
+        suppressGestureSpinnerEvents = true
+
+        viewBinding.bottomSwipeUpActionSpinner.setSelection(config.bottomSwipeUpAction.ordinal)
+        viewBinding.twoFingerTapBottomActionSpinner.setSelection(
+            config.twoFingerTapBottomAction.ordinal
+        )
+        viewBinding.twoFingerTapTopActionSpinner.setSelection(config.twoFingerTapTopAction.ordinal)
+
+        suppressGestureSpinnerEvents = false
 
         showBubbleScale(config.bubbleScale)
 
@@ -258,6 +296,39 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
             R.string.viewer_settings_max_zoom_value,
             String.format(Locale.ROOT, "%.0f×", maxZoom)
         )
+    }
+
+    /**
+     * True while the saved config is being applied to the gesture spinners.
+     * Spinner selection events are ignored while it is set.
+     */
+    private var suppressGestureSpinnerEvents = true
+
+    private fun setupGestureSpinner(
+        spinner: Spinner,
+        items: List<String>,
+        onChange: (ViewerGestureAction) -> Unit
+    ) {
+        spinner.adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_item,
+            items
+        ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                if (!suppressGestureSpinnerEvents) {
+                    onChange(ViewerGestureAction.values()[position])
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
     }
 
     private fun enableView(view: View, enable: Boolean = true) {

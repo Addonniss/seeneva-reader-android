@@ -514,6 +514,9 @@ class BookViewerPageFragment :
                     isEnabled = true
                     isGone = false
                     alpha = 1.0f
+                    //The app detects two-finger double-taps itself, so disable the
+                    //library hidden quick-scale (two-finger tap zoom toggle)
+                    setQuickScaleEnabled(false)
                     setOnTouchListener(onTouchListener)
                 }
 

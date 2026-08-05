@@ -129,4 +129,58 @@ class ViewerConfigTest {
 
         assertFalse(decoded.doubleTapPageNav)
     }
+
+    @Test
+    fun gestureActionsDefaults() {
+        val config = ViewerConfig()
+
+        assertEquals(ViewerGestureAction.NONE, config.bottomSwipeUpAction)
+        assertEquals(ViewerGestureAction.THUMBNAIL_NAVIGATION, config.twoFingerTapBottomAction)
+        assertEquals(ViewerGestureAction.SETTINGS, config.twoFingerTapTopAction)
+    }
+
+    @Test
+    fun oldStoredConfigWithoutGestureActionsDecodesToDefaults() {
+        //Simulate a viewer config saved before configurable gestures existed
+        val oldConfig = """{"keep_screen_on":true,"brightness":-1.0,"tts":true}"""
+
+        val decoded = json.decodeFromString<ViewerConfig>(oldConfig)
+
+        assertEquals(ViewerGestureAction.NONE, decoded.bottomSwipeUpAction)
+        assertEquals(ViewerGestureAction.THUMBNAIL_NAVIGATION, decoded.twoFingerTapBottomAction)
+        assertEquals(ViewerGestureAction.SETTINGS, decoded.twoFingerTapTopAction)
+    }
+
+    @Test
+    fun gestureActionsRoundTrip() {
+        val config = ViewerConfig(
+            bottomSwipeUpAction = ViewerGestureAction.SETTINGS,
+            twoFingerTapBottomAction = ViewerGestureAction.NONE,
+            twoFingerTapTopAction = ViewerGestureAction.THUMBNAIL_NAVIGATION
+        )
+
+        val decoded = json.decodeFromString<ViewerConfig>(json.encodeToString(config))
+
+        assertEquals(ViewerGestureAction.SETTINGS, decoded.bottomSwipeUpAction)
+        assertEquals(ViewerGestureAction.NONE, decoded.twoFingerTapBottomAction)
+        assertEquals(ViewerGestureAction.THUMBNAIL_NAVIGATION, decoded.twoFingerTapTopAction)
+    }
+
+    @Test
+    fun everyActionAssignableToEveryGesture() {
+        //Any gesture must be assignable to any action, including NONE
+        for (action in ViewerGestureAction.values()) {
+            val config = ViewerConfig(
+                bottomSwipeUpAction = action,
+                twoFingerTapBottomAction = action,
+                twoFingerTapTopAction = action
+            )
+
+            val decoded = json.decodeFromString<ViewerConfig>(json.encodeToString(config))
+
+            assertEquals(action, decoded.bottomSwipeUpAction)
+            assertEquals(action, decoded.twoFingerTapBottomAction)
+            assertEquals(action, decoded.twoFingerTapTopAction)
+        }
+    }
 }

@@ -46,7 +46,13 @@ data class ViewerConfig(
     @SerialName("max_zoom")
     val maxZoom: Float = 2.0f,
     @SerialName("double_tap_page_nav")
-    val doubleTapPageNav: Boolean = true
+    val doubleTapPageNav: Boolean = true,
+    @SerialName("bottom_swipe_up_action")
+    val bottomSwipeUpAction: ViewerGestureAction = ViewerGestureAction.NONE,
+    @SerialName("two_finger_tap_bottom_action")
+    val twoFingerTapBottomAction: ViewerGestureAction = ViewerGestureAction.THUMBNAIL_NAVIGATION,
+    @SerialName("two_finger_tap_top_action")
+    val twoFingerTapTopAction: ViewerGestureAction = ViewerGestureAction.SETTINGS
 ) {
     val systemBrightness
         get() = brightness == SYSTEM_BRIGHTNESS
@@ -54,6 +60,26 @@ data class ViewerConfig(
     companion object {
         const val SYSTEM_BRIGHTNESS = -1.0f
     }
+}
+
+/**
+ * Action which can be assigned to a viewer gesture
+ */
+enum class ViewerGestureAction {
+    /**
+     * Gesture does nothing
+     */
+    NONE,
+
+    /**
+     * Gesture opens the thumbnail navigation (pages preview)
+     */
+    THUMBNAIL_NAVIGATION,
+
+    /**
+     * Gesture opens the viewer settings
+     */
+    SETTINGS
 }
 
 /**
