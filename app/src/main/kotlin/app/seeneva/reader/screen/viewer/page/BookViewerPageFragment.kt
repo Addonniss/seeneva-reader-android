@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.*
 import org.koin.core.scope.KoinScopeComponent
 import org.koin.core.scope.get
 import java.util.*
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 interface BookViewerPageView : PresenterStatefulView
@@ -101,6 +102,16 @@ class BookViewerPageFragment :
             get(),
         )
     }
+
+    /**
+     * Viewer settings relevant to the page object helper and page zoom
+     */
+    private data class ViewerSettings(
+        val instant: Boolean,
+        val bubbleScale: Float,
+        val maxZoom: Float,
+        val doubleTapPageNav: Boolean
+    )
 
     /**
      * Return help fragment instance if it was already showed
@@ -166,6 +177,32 @@ class BookViewerPageFragment :
                 return isHideObjectBalloonTap(e)
             }
 
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                //Double-tap page navigation only at the fit (min) scale with a single pointer.
+                //When zoomed in, the underlying image view keeps its zoom-out behavior.
+                val siv = viewBinding.scaleImageView
+
+                if (!doubleTapPageNavEnabled ||
+                    !siv.isReady ||
+                    e.pointerCount > 1 ||
+                    abs(siv.scale - siv.minScale) > DOUBLE_TAP_NAV_SCALE_TOLERANCE
+                ) {
+                    return false
+                }
+
+                consumeDoubleTap = true
+
+                val direction =
+                    requireNotNull(presenter.readDirectionState.value) { "Read direction is null" }
+                        .nextObjectDirectionTap(e)
+
+                //ViewPager2.setCurrentItem is unsafe inside the touch dispatch,
+                //so apply the page jump after the event is fully processed
+                siv.post { callback?.onPageNavRequest(direction) }
+
+                return true
+            }
+
             override fun onLongPress(e: MotionEvent) {
                 var actionPerformed = false
 
@@ -213,8 +250,29 @@ class BookViewerPageFragment :
         @Suppress("ClickableViewAccessibility")
         View.OnTouchListener { _, e ->
             gestureDetector.onTouchEvent(e)
-            false
+
+            //Consume the second tap of a double-tap used for page navigation so the
+            //subsampling view does not also perform its zoom
+            if (consumeDoubleTap) {
+                when (e.actionMasked) {
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> consumeDoubleTap = false
+                }
+
+                true
+            } else {
+                false
+            }
         }
+
+    /**
+     * True while the second tap of a double-tap is being consumed for page navigation
+     */
+    private var consumeDoubleTap = false
+
+    /**
+     * Is double-tap page navigation setting enabled
+     */
+    private var doubleTapPageNavEnabled = false
 
     private var snackbar: Snackbar? = null
 
@@ -239,20 +297,28 @@ class BookViewerPageFragment :
 
         //Track viewer settings relevant to the page object helper and page zoom
         viewerConfigUseCase.configFlow()
-            .map { Triple(it.instantViewerInteractions, it.bubbleScale, it.maxZoom) }
+            .map {
+                ViewerSettings(
+                    instant = it.instantViewerInteractions,
+                    bubbleScale = it.bubbleScale,
+                    maxZoom = it.maxZoom,
+                    doubleTapPageNav = it.doubleTapPageNav
+                )
+            }
             .distinctUntilChanged()
-            .observe(viewLifecycleOwner) { (instant, bubbleScale, maxZoom) ->
-                objectImageHelper.instantInteractions = instant
-                objectImageHelper.bubbleScale = bubbleScale
+            .observe(viewLifecycleOwner) { settings ->
+                objectImageHelper.instantInteractions = settings.instant
+                objectImageHelper.bubbleScale = settings.bubbleScale
+                doubleTapPageNavEnabled = settings.doubleTapPageNav
 
                 val scaleImageView = viewBinding.scaleImageView
 
-                scaleImageView.setMaxScale(maxZoom)
+                scaleImageView.setMaxScale(settings.maxZoom)
 
                 //If the page is currently zoomed beyond the newly selected maximum,
                 //clamp it immediately (setScaleAndCenter applies the library clamp)
-                if (scaleImageView.isReady && scaleImageView.scale > maxZoom) {
-                    scaleImageView.setScaleAndCenter(maxZoom, scaleImageView.center!!)
+                if (scaleImageView.isReady && scaleImageView.scale > settings.maxZoom) {
+                    scaleImageView.setScaleAndCenter(settings.maxZoom, scaleImageView.center!!)
                 }
             }
 
@@ -677,6 +743,12 @@ class BookViewerPageFragment :
          * @param direction object read direction
          */
         fun lastObjectViewed(pageId: Long, direction: PageObjectDirection)
+
+        /**
+         * Called when the user double-taps the page to navigate
+         * @param direction page navigation direction
+         */
+        fun onPageNavRequest(direction: PageObjectDirection)
     }
 
     /**
@@ -697,6 +769,12 @@ class BookViewerPageFragment :
         private const val TIP_NEXT_BALLOON_ID = 0
         private const val TIP_HIDE_BALLOON_ID = 1
         private const val TIP_TTS_BALLOON_ID = 2
+
+        /**
+         * Tolerance for treating the current page scale as the fit (min) scale.
+         * The subsampling view scale can drift slightly from the exact min scale value.
+         */
+        private const val DOUBLE_TAP_NAV_SCALE_TOLERANCE = 0.01f
 
         private val Bundle.isObjectWasVisible
             get() = getBoolean(STATE_OBJECT_WAS_VISIBLE)

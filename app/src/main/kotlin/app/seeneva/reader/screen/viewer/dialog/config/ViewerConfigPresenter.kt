@@ -81,6 +81,12 @@ interface ViewerConfigPresenter : Presenter {
      * @param maxZoom maximum zoom scale
      */
     fun onMaxZoomChange(maxZoom: Float)
+
+    /**
+     * User changed double tap page navigation setting
+     * @param enabled is double tap page navigation enabled
+     */
+    fun onDoubleTapPageNavChange(enabled: Boolean)
 }
 
 class ViewerConfigPresenterImpl(
@@ -215,6 +221,14 @@ class ViewerConfigPresenterImpl(
         currentConfig()?.also {
             if (it.maxZoom != maxZoom) {
                 viewModel.saveConfig(it.copy(maxZoom = maxZoom))
+            }
+        }
+    }
+
+    override fun onDoubleTapPageNavChange(enabled: Boolean) {
+        currentConfig()?.also {
+            if (it.doubleTapPageNav != enabled) {
+                viewModel.saveConfig(it.copy(doubleTapPageNav = enabled))
             }
         }
     }

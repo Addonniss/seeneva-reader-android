@@ -104,4 +104,29 @@ class ViewerConfigTest {
 
         assertEquals(3.0f, decoded.maxZoom)
     }
+
+    @Test
+    fun doubleTapPageNavDefaultsToTrue() {
+        //Default value must enable double-tap page navigation
+        assertTrue(ViewerConfig().doubleTapPageNav)
+    }
+
+    @Test
+    fun oldStoredConfigWithoutDoubleTapPageNavDecodesToTrue() {
+        //Simulate a viewer config saved before "double-tap page navigation" setting existed
+        val oldConfig = """{"keep_screen_on":true,"brightness":-1.0,"tts":true}"""
+
+        val decoded = json.decodeFromString<ViewerConfig>(oldConfig)
+
+        assertTrue(decoded.doubleTapPageNav)
+    }
+
+    @Test
+    fun doubleTapPageNavRoundTrip() {
+        val config = ViewerConfig(doubleTapPageNav = false)
+
+        val decoded = json.decodeFromString<ViewerConfig>(json.encodeToString(config))
+
+        assertFalse(decoded.doubleTapPageNav)
+    }
 }

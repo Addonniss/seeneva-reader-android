@@ -76,6 +76,16 @@
             android:text="@string/viewer_settings_instant_interactions"
             android:textSize="16sp" />
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/doubleTapPageNavSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:minHeight="48dp"
+            android:text="@string/viewer_settings_double_tap_page_nav"
+            android:textSize="16sp" />
+
         <TextView
             android:id="@+id/bubbleScaleLabel"
             android:layout_width="match_parent"

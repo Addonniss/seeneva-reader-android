@@ -44,7 +44,9 @@ data class ViewerConfig(
     @SerialName("bubble_scale")
     val bubbleScale: Float = 1.0f,
     @SerialName("max_zoom")
-    val maxZoom: Float = 2.0f
+    val maxZoom: Float = 2.0f,
+    @SerialName("double_tap_page_nav")
+    val doubleTapPageNav: Boolean = true
 ) {
     val systemBrightness
         get() = brightness == SYSTEM_BRIGHTNESS

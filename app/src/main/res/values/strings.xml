@@ -123,6 +123,7 @@
     <string name="viewer_settings_system_brightness">System brightness</string>
     <string name="viewer_settings_tts">Text-to-speech (English only)</string>
     <string name="viewer_settings_instant_interactions">Instant viewer interactions</string>
+    <string name="viewer_settings_double_tap_page_nav">Double-tap page navigation</string>
     <string name="viewer_settings_bubble_scale">Bubble size</string>
     <string name="viewer_settings_bubble_scale_value">Bubble size: %1$d%%</string>
     <string name="viewer_settings_max_zoom">Maximum zoom</string>

@@ -487,6 +487,18 @@ class BookViewerActivity :
         }
     }
 
+    override fun onPageNavRequest(direction: PageObjectDirection) {
+        val pagePosToShow = if (direction == PageObjectDirection.FORWARD) {
+            viewerPager.currentItem + 1
+        } else {
+            viewerPager.currentItem - 1
+        }
+
+        if (pagePosToShow in 0 until viewerPager.count) {
+            viewerPager.setCurrentItem(pagePosToShow, smoothScroll = !instantViewerInteractions)
+        }
+    }
+
     /**
      * Show comic book view settings
      */

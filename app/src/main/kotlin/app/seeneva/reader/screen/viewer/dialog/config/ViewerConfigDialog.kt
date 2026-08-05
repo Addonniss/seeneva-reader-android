@@ -113,6 +113,10 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
             presenter.onInstantInteractionsChange(isChecked)
         }
 
+        viewBinding.doubleTapPageNavSwitch.setOnCheckedChangeListener { _, isChecked ->
+            presenter.onDoubleTapPageNavChange(isChecked)
+        }
+
         viewBinding.ttsSwitch.setOnClickListener { presenter.onTtsChange(viewBinding.ttsSwitch.isChecked) }
 
         viewBinding.brightnessSlider.setLabelFormatter(object : LabelFormatter {
@@ -205,6 +209,8 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
         viewBinding.keepScreenOnSwitch.isChecked = config.keepScreenOn
 
         viewBinding.instantInteractionsSwitch.isChecked = config.instantViewerInteractions
+
+        viewBinding.doubleTapPageNavSwitch.isChecked = config.doubleTapPageNav
 
         showBubbleScale(config.bubbleScale)
 
