@@ -237,13 +237,23 @@ class BookViewerPageFragment :
             savedInstanceState?.isObjectWasVisible ?: false
         )
 
-        //Track viewer settings relevant to the page object helper
+        //Track viewer settings relevant to the page object helper and page zoom
         viewerConfigUseCase.configFlow()
-            .map { it.instantViewerInteractions to it.bubbleScale }
+            .map { Triple(it.instantViewerInteractions, it.bubbleScale, it.maxZoom) }
             .distinctUntilChanged()
-            .observe(viewLifecycleOwner) { (instant, bubbleScale) ->
+            .observe(viewLifecycleOwner) { (instant, bubbleScale, maxZoom) ->
                 objectImageHelper.instantInteractions = instant
                 objectImageHelper.bubbleScale = bubbleScale
+
+                val scaleImageView = viewBinding.scaleImageView
+
+                scaleImageView.setMaxScale(maxZoom)
+
+                //If the page is currently zoomed beyond the newly selected maximum,
+                //clamp it immediately (setScaleAndCenter applies the library clamp)
+                if (scaleImageView.isReady && scaleImageView.scale > maxZoom) {
+                    scaleImageView.setScaleAndCenter(maxZoom, scaleImageView.center!!)
+                }
             }
 
         presenter.showHelpFlow

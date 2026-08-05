@@ -75,6 +75,12 @@ interface ViewerConfigPresenter : Presenter {
      * @param scale bubble size multiplier
      */
     fun onBubbleScaleChange(scale: Float)
+
+    /**
+     * User changed maximum zoom setting
+     * @param maxZoom maximum zoom scale
+     */
+    fun onMaxZoomChange(maxZoom: Float)
 }
 
 class ViewerConfigPresenterImpl(
@@ -201,6 +207,14 @@ class ViewerConfigPresenterImpl(
         currentConfig()?.also {
             if (it.bubbleScale != scale) {
                 viewModel.saveConfig(it.copy(bubbleScale = scale))
+            }
+        }
+    }
+
+    override fun onMaxZoomChange(maxZoom: Float) {
+        currentConfig()?.also {
+            if (it.maxZoom != maxZoom) {
+                viewModel.saveConfig(it.copy(maxZoom = maxZoom))
             }
         }
     }

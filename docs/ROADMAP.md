@@ -5,7 +5,7 @@
 - [x] Instant viewer interactions (implemented as viewer setting "Instant viewer interactions"; replaces "Disable viewer animations" naming)
 - [x] Direct bubble selection
 - [x] Bubble size adjustment (viewer setting "Bubble size": percentage slider 100%–400% scaling the enlarged bubble relative to page min scale; manual device verification by the Romanian user)
-- [ ] Maximum zoom adjustment
+- [x] Maximum zoom adjustment (viewer setting "Maximum zoom": 1×–10× in 1× increments, default 2× preserving the original behavior; persistent; manually verified on the physical device by the Romanian user)
 - [ ] Double-tap page navigation
 - [ ] Alternative thumbnail navigation gesture
 

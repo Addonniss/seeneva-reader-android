@@ -42,7 +42,9 @@ data class ViewerConfig(
     @SerialName("instant_viewer_interactions")
     val instantViewerInteractions: Boolean = false,
     @SerialName("bubble_scale")
-    val bubbleScale: Float = 1.0f
+    val bubbleScale: Float = 1.0f,
+    @SerialName("max_zoom")
+    val maxZoom: Float = 2.0f
 ) {
     val systemBrightness
         get() = brightness == SYSTEM_BRIGHTNESS

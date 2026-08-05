@@ -52,6 +52,7 @@ import org.koin.core.scope.inject
 import org.tinylog.kotlin.Logger
 import java.text.Format
 import java.text.NumberFormat
+import java.util.Locale
 import kotlin.math.roundToInt
 
 interface ViewerConfigView : PresenterView {
@@ -75,6 +76,11 @@ interface ViewerConfigView : PresenterView {
      * @param scale bubble scale multiplier to show
      */
     fun showBubbleScale(scale: Float)
+
+    /**
+     * @param maxZoom maximum zoom scale to show
+     */
+    fun showMaxZoom(maxZoom: Float)
 }
 
 class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeComponent {
@@ -144,6 +150,26 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
             }
         }
 
+        viewBinding.maxZoomSlider.setLabelFormatter(object : LabelFormatter {
+            private val formatter: Format =
+                NumberFormat.getNumberInstance()
+                    .apply {
+                        minimumFractionDigits = 0
+                        maximumFractionDigits = 0
+                    }
+
+            override fun getFormattedValue(value: Float) =
+                "${formatter.format(value)}×"
+        })
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewBinding.maxZoomSlider.userProgress().collect { maxZoom ->
+                showMaxZoom(maxZoom)
+
+                presenter.onMaxZoomChange(maxZoom)
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             presenter.changeTtsEvents.collect {
                 when (it) {
@@ -182,6 +208,8 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
 
         showBubbleScale(config.bubbleScale)
 
+        showMaxZoom(config.maxZoom)
+
         @SuppressLint("Range")
         if (config.systemBrightness) {
             viewBinding.systemBrightnessSwitch.isChecked = true
@@ -212,6 +240,18 @@ class ViewerConfigDialog : BaseDraggableDialog(), ViewerConfigView, KoinScopeCom
 
         viewBinding.bubbleScaleLabel.text =
             getString(R.string.viewer_settings_bubble_scale_value, (scale * 100).roundToInt())
+    }
+
+    override fun showMaxZoom(maxZoom: Float) {
+        viewBinding.maxZoomSlider.value = maxZoom.coerceIn(
+            viewBinding.maxZoomSlider.valueFrom,
+            viewBinding.maxZoomSlider.valueTo
+        )
+
+        viewBinding.maxZoomLabel.text = getString(
+            R.string.viewer_settings_max_zoom_value,
+            String.format(Locale.ROOT, "%.0f×", maxZoom)
+        )
     }
 
     private fun enableView(view: View, enable: Boolean = true) {

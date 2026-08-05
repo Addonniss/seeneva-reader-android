@@ -96,6 +96,26 @@
             android:valueFrom="1.0"
             android:valueTo="4.0" />
 
+        <TextView
+            android:id="@+id/maxZoomLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:text="@string/viewer_settings_max_zoom"
+            android:textSize="16sp"
+            tools:text="Maximum zoom: 2×" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/maxZoomSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/viewer_settings_max_zoom"
+            android:minHeight="48dp"
+            android:stepSize="1.0"
+            android:valueFrom="1.0"
+            android:valueTo="10.0" />
+
     </androidx.appcompat.widget.LinearLayoutCompat>
 
 </androidx.core.widget.NestedScrollView>

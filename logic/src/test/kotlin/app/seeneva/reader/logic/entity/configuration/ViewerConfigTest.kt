@@ -79,4 +79,29 @@ class ViewerConfigTest {
 
         assertEquals(1.5f, decoded.bubbleScale)
     }
+
+    @Test
+    fun maxZoomDefaultsToTwo() {
+        //Default value must preserve current Seeneva behavior (library max scale 2.0)
+        assertEquals(2.0f, ViewerConfig().maxZoom)
+    }
+
+    @Test
+    fun oldStoredConfigWithoutMaxZoomDecodesToTwo() {
+        //Simulate a viewer config saved before "maximum zoom" setting existed
+        val oldConfig = """{"keep_screen_on":true,"brightness":-1.0,"tts":true}"""
+
+        val decoded = json.decodeFromString<ViewerConfig>(oldConfig)
+
+        assertEquals(2.0f, decoded.maxZoom)
+    }
+
+    @Test
+    fun maxZoomRoundTrip() {
+        val config = ViewerConfig(maxZoom = 3.0f)
+
+        val decoded = json.decodeFromString<ViewerConfig>(json.encodeToString(config))
+
+        assertEquals(3.0f, decoded.maxZoom)
+    }
 }
