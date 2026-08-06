@@ -38,10 +38,13 @@ import kotlin.math.sqrt
  *
  * @param slopPx touch slop: movement beyond it before the hold completes cancels
  * the rectangle gesture (normal pinch)
+ * @param holdStillnessSlopPx movement beyond it while waiting for the hold
+ * restarts the stillness window, so a drifting pinch never activates
  * @param minSelectionPx minimum selection size (view px) to produce a zoom request
  */
 class TwoFingerRectangleSelector(
     private val slopPx: Float = 24f,
+    private val holdStillnessSlopPx: Float = 6f,
     private val minSelectionPx: Float = 48f
 ) {
     private enum class State { IDLE, TRACKING, HOLD_PENDING, SELECTING, PINCH }
@@ -107,10 +110,30 @@ class TwoFingerRectangleSelector(
     }
 
     /**
+     * True when the fingers moved more than the stillness slop since the hold
+     * window started. The caller restarts the hold timer while this is true, so
+     * rectangle selection activates only after the fingers stay still: a slow
+     * pinch keeps moving and never activates.
+     */
+    fun movedSinceHoldStart(x0: Float, y0: Float, x1: Float, y1: Float): Boolean {
+        if (state != State.HOLD_PENDING) return false
+
+        return abs(span(x0, y0, x1, y1) - startSpan) > holdStillnessSlopPx ||
+            distance(
+                startCentroidX,
+                startCentroidY,
+                (x0 + x1) * 0.5f,
+                (y0 + y1) * 0.5f
+            ) > holdStillnessSlopPx
+    }
+
+    /**
      * Feed a touch event.
      *
      * @param action [MotionEvent.getActionMasked]
-     * @param pointerCount current pointer count
+     * @param pointerCount number of remaining active pointers after this event;
+     * for [MotionEvent.ACTION_POINTER_UP] pass the raw pointer count minus the
+     * lifted pointer
      * @param x0/y0 first pointer position
      * @param x1/y1 second pointer position (valid when pointerCount >= 2)
      * @return true when the selection completed on this event (zoom request)
@@ -193,7 +216,13 @@ class TwoFingerRectangleSelector(
                     }
 
                     State.SELECTING -> {
-                        if (pointerCount <= 1 && !selectionCompleted) {
+                        val isLift =
+                            action == MotionEvent.ACTION_POINTER_UP ||
+                                action == MotionEvent.ACTION_UP
+
+                        val completedNow = isLift && !selectionCompleted
+
+                        if (completedNow) {
                             //First finger lifted - complete the selection.
                             //Keep consuming until the last finger is lifted.
                             selectionCompleted = true
@@ -206,14 +235,26 @@ class TwoFingerRectangleSelector(
                             )
 
                             previewVisible = false
-
-                            return completedRect.width() >= minSelectionPx &&
-                                completedRect.height() >= minSelectionPx
                         }
 
                         if (action == MotionEvent.ACTION_UP) {
-                            //The gesture fully ended
+                            //The gesture fully ended: always return to a clean
+                            //state, even if the completion happened on this event
+                            val request = completedNow &&
+                                completedRect.width() >= minSelectionPx &&
+                                completedRect.height() >= minSelectionPx
+
                             reset()
+
+                            return request
+                        }
+
+                        //The first lift reports the zoom request; the selector
+                        //stays in SELECTING until the last finger lifts
+                        if (isLift) {
+                            return selectionCompleted &&
+                                completedRect.width() >= minSelectionPx &&
+                                completedRect.height() >= minSelectionPx
                         }
                     }
 

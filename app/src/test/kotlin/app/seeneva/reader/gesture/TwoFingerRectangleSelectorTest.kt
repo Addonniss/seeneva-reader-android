@@ -240,4 +240,71 @@ class TwoFingerRectangleSelectorTest {
 
         assertFalse(selector.isSelecting)
     }
+
+    // ---------- Stillness window (B1) ----------
+
+    @Test
+    fun stillHoldHasNoMovementSinceHoldStart() {
+        twoFingersDown(100f, 200f, 300f, 400f)
+
+        //Perfectly still and tiny jitter below the stillness slop
+        assertFalse(selector.movedSinceHoldStart(100f, 200f, 300f, 400f))
+        assertFalse(selector.movedSinceHoldStart(101f, 201f, 299f, 399f))
+    }
+
+    @Test
+    fun spanDriftBeyondStillnessRestartsWindow() {
+        twoFingersDown(100f, 200f, 300f, 400f)
+
+        //A slow pinch drifts the span but not the centroid
+        assertTrue(selector.movedSinceHoldStart(110f, 200f, 290f, 400f))
+    }
+
+    @Test
+    fun centroidDriftBeyondStillnessRestartsWindow() {
+        twoFingersDown(100f, 200f, 300f, 400f)
+
+        //A two-finger drag drifts the centroid but not the span
+        assertTrue(selector.movedSinceHoldStart(150f, 250f, 350f, 450f))
+    }
+
+    @Test
+    fun smallSettlingMovementStillActivates() {
+        twoFingersDown(100f, 200f, 300f, 400f)
+
+        //Small settling movement below the stillness slop does not block activation
+        assertFalse(selector.movedSinceHoldStart(102f, 201f, 298f, 399f))
+
+        selector.enterSelecting()
+
+        assertTrue(selector.isSelecting)
+    }
+
+    @Test
+    fun movedSinceHoldStartIgnoredOutsideHoldPending() {
+        twoFingersDown(100f, 200f, 300f, 400f)
+        selector.enterSelecting()
+
+        //No longer in HOLD_PENDING: no stillness signal
+        assertFalse(selector.movedSinceHoldStart(150f, 250f, 350f, 450f))
+    }
+
+    @Test
+    fun completionOnFinalUpNeverStaysStuck() {
+        twoFingersDown(100f, 200f, 300f, 400f)
+        selector.enterSelecting()
+        move(150f, 250f, 350f, 450f)
+
+        //A caller that passes the raw ACTION_POINTER_UP count (2) skips the
+        //completion at the first lift; the completion then lands on the final
+        //ACTION_UP (remaining count 1). The selector must complete AND reset,
+        //never staying stuck in SELECTING.
+        val request = selector.onEvent(MotionEvent.ACTION_UP, 1, 350f, 450f, 350f, 450f)
+
+        assertTrue(request)
+        assertFalse(selector.isSelecting)
+        assertFalse(selector.isHoldPending)
+        assertFalse(selector.previewVisible)
+        assertEquals(RectF(150f, 250f, 350f, 450f), selector.completedRect)
+    }
 }

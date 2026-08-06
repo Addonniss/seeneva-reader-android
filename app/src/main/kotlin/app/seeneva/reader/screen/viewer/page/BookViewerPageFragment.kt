@@ -258,7 +258,7 @@ class BookViewerPageFragment :
 
     private val onTouchListener =
         @Suppress("ClickableViewAccessibility")
-        View.OnTouchListener { _, e ->
+        View.OnTouchListener { view, e ->
             //Do not feed the single-tap detector while the rectangle selection is
             //active: a no-movement two-finger hold/release must not be interpreted
             //as a single tap (bubble selection / object action after the zoom)
@@ -275,26 +275,58 @@ class BookViewerPageFragment :
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> gestureMaxPointers = 1
             }
 
+            //The selector is still SELECTING before this event is processed; after
+            //the terminating UP (or CANCEL) it resets to IDLE
+            val selectingBefore = rectangleSelector.isSelecting
+
+            //ACTION_POINTER_UP includes the lifted pointer in its count; the
+            //selector works with the number of remaining active pointers
+            val pointerCount =
+                if (e.actionMasked == MotionEvent.ACTION_POINTER_UP) e.pointerCount - 1 else e.pointerCount
+
             val selectionCompleted = rectangleSelector.onEvent(
                 action = e.actionMasked,
-                pointerCount = e.pointerCount,
+                pointerCount = pointerCount,
                 x0 = e.getX(0),
                 y0 = e.getY(0),
                 x1 = if (e.pointerCount > 1) e.getX(1) else e.getX(0),
                 y1 = if (e.pointerCount > 1) e.getY(1) else e.getY(0)
             )
 
+            //Do not start the zoom on the first finger lift: the image view must
+            //receive the terminating UP (with no animation running) so it resets
+            //its gesture state (isZooming, isPanning, maxTouchCount)
             if (selectionCompleted) {
-                performRectangleZoom(rectangleSelector.completedRect)
+                pendingZoomRect.set(rectangleSelector.completedRect)
+                zoomPending = true
             }
 
             //Start the hold timer when two fingers land; cancel it as soon as the
-            //selector leaves the hold-pending state (pinch, lift, cancel, activation)
+            //selector leaves the hold-pending state (pinch, lift, cancel, activation).
+            //While the fingers are still moving the timer is restarted, so the
+            //rectangle activates only after they stay still (a slow pinch keeps
+            //restarting and never activates)
             if (e.actionMasked == MotionEvent.ACTION_POINTER_DOWN && e.pointerCount == 2) {
                 startRectangleHoldTimer()
             } else if (!rectangleSelector.isHoldPending) {
                 holdJob?.cancel()
                 holdJob = null
+            } else if (
+                e.actionMasked == MotionEvent.ACTION_MOVE &&
+                e.pointerCount >= 2 &&
+                rectangleSelector.movedSinceHoldStart(e.getX(0), e.getY(0), e.getX(1), e.getY(1))
+            ) {
+                startRectangleHoldTimer()
+            }
+
+            //The gesture ended: execute the deferred zoom after the terminating
+            //event has fully propagated to the image view
+            if (selectingBefore && !rectangleSelector.isSelecting && zoomPending) {
+                zoomPending = false
+
+                view.post {
+                    performRectangleZoom(pendingZoomRect)
+                }
             }
 
             //Update the rectangle selection preview overlay
@@ -352,6 +384,14 @@ class BookViewerPageFragment :
      * Pending hold timer which activates the rectangle selection
      */
     private var holdJob: Job? = null
+
+    /**
+     * Completed rectangle zoom request, deferred until the terminating UP so the
+     * image view receives that event (with no animation running) and resets its
+     * own gesture state before the zoom starts
+     */
+    private var zoomPending = false
+    private val pendingZoomRect = RectF()
 
     /**
      * Start the timer which activates the rectangle selection after the hold
