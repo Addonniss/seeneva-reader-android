@@ -110,4 +110,47 @@ class ViewerPagerTest {
             )
         )
     }
+
+    @Test
+    fun multiTouchGestureNeverTurnsPage() {
+        //A multi-touch gesture (e.g. rectangle selection or pinch) with a large
+        //horizontal displacement must never turn the page
+        assertNull(
+            ViewerPager.instantPageTurnTarget(
+                currentItem = 0,
+                itemCount = 10,
+                dx = -300f,
+                width = 1000,
+                thresholdFraction = 0.25f,
+                multiTouch = true
+            )
+        )
+
+        assertNull(
+            ViewerPager.instantPageTurnTarget(
+                currentItem = 1,
+                itemCount = 10,
+                dx = 300f,
+                width = 1000,
+                thresholdFraction = 0.25f,
+                multiTouch = true
+            )
+        )
+    }
+
+    @Test
+    fun singleTouchSwipeStillTurnsPage() {
+        //The multi-touch guard must not affect normal one-finger swipes
+        assertEquals(
+            1,
+            ViewerPager.instantPageTurnTarget(
+                currentItem = 0,
+                itemCount = 10,
+                dx = -300f,
+                width = 1000,
+                thresholdFraction = 0.25f,
+                multiTouch = false
+            )
+        )
+    }
 }

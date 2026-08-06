@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.transform
 import org.koin.core.scope.KoinScopeComponent
 import org.koin.core.scope.get
 import kotlin.coroutines.resume
+import kotlin.math.max
 import kotlin.properties.Delegates
 
 interface BookViewerView : PresenterStatefulView {
@@ -178,6 +179,12 @@ class BookViewerActivity :
     private var twoFingerTapTopAction: ViewerGestureAction = ViewerGestureAction.SETTINGS
 
     private val twoFingerDoubleTapDetector by lazy { TwoFingerDoubleTapDetector() }
+
+    /**
+     * Max pointer count of the current touch gesture.
+     * Used to prevent multi-touch gestures from triggering the bottom swipe action.
+     */
+    private var gestureMaxPointers = 1
 
     /**
      * True when the app UI (toolbar, thumbnail navigation, grey-out) should be visible.
@@ -295,10 +302,13 @@ class BookViewerActivity :
                     }
 
                     //Configurable "swipe up from the bottom" gesture.
-                    //Works in the normal reading state (system UI hidden)
+                    //Works in the normal reading state (system UI hidden).
+                    //Only single-pointer gestures trigger it so a two-finger
+                    //gesture (e.g. rectangle selection) cannot activate it
                     if (bottomSwipeUpAction != ViewerGestureAction.NONE &&
                         viewState == ViewState.LOADED &&
                         systemUiManager.stateFlow.value == SystemUiState.HIDDEN &&
+                        gestureMaxPointers == 1 &&
                         velocityY < -swipeUpVelocityThreshold &&
                         e1.y > screenHeightPx / 2f
                     ) {
@@ -350,6 +360,14 @@ class BookViewerActivity :
             // On Android 9 dispatchTouchEvent can be called after the Activity was closed
             // https://github.com/Seeneva/seeneva-reader-android/issues/24
             gestureDetector.onTouchEvent(ev)
+
+            //Track the max pointer count of the current gesture
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> gestureMaxPointers = 1
+                MotionEvent.ACTION_POINTER_DOWN ->
+                    gestureMaxPointers = max(gestureMaxPointers, ev.pointerCount)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> gestureMaxPointers = 1
+            }
 
             val twoFingerFired = twoFingerDoubleTapDetector.onEvent(
                 action = ev.actionMasked,

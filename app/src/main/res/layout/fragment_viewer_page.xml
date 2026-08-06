@@ -36,6 +36,13 @@
         app:strokeColor="@color/black_alpha_50"
         app:strokeWidth="1dp" />
 
+    <View
+        android:id="@+id/areaZoomPreviewView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@drawable/area_zoom_preview"
+        android:visibility="gone" />
+
     <include
         layout="@layout/layout_viewer_states"
         android:layout_width="match_parent"

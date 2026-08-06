@@ -22,12 +22,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Build
 import android.os.Bundle
 import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.widget.FrameLayout
 import androidx.core.content.getSystemService
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.component1
@@ -51,6 +53,8 @@ import app.seeneva.reader.databinding.FragmentViewerPageBinding
 import app.seeneva.reader.databinding.LayoutViewerStatesBinding
 import app.seeneva.reader.di.*
 import app.seeneva.reader.extension.*
+import app.seeneva.reader.gesture.RectangleZoomCalculator
+import app.seeneva.reader.gesture.TwoFingerRectangleSelector
 import app.seeneva.reader.logic.entity.Direction
 import app.seeneva.reader.logic.usecase.ViewerConfigUseCase
 import app.seeneva.reader.presenter.PresenterStatefulView
@@ -64,6 +68,7 @@ import org.koin.core.scope.KoinScopeComponent
 import org.koin.core.scope.get
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 interface BookViewerPageView : PresenterStatefulView
@@ -204,6 +209,11 @@ class BookViewerPageFragment :
             }
 
             override fun onLongPress(e: MotionEvent) {
+                //A two-finger gesture must not trigger the single-finger long-press
+                if (gestureMaxPointers > 1) {
+                    return
+                }
+
                 var actionPerformed = false
 
                 //if object view is visible lets check if user pressed on it firstly
@@ -249,7 +259,50 @@ class BookViewerPageFragment :
     private val onTouchListener =
         @Suppress("ClickableViewAccessibility")
         View.OnTouchListener { _, e ->
-            gestureDetector.onTouchEvent(e)
+            //Do not feed the single-tap detector while the rectangle selection is
+            //active: a no-movement two-finger hold/release must not be interpreted
+            //as a single tap (bubble selection / object action after the zoom)
+            if (!rectangleSelector.isSelecting) {
+                gestureDetector.onTouchEvent(e)
+            }
+
+            //Track the max pointer count of the current gesture to suppress
+            //single-finger long-press while a two-finger gesture is active
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> gestureMaxPointers = 1
+                MotionEvent.ACTION_POINTER_DOWN ->
+                    gestureMaxPointers = max(gestureMaxPointers, e.pointerCount)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> gestureMaxPointers = 1
+            }
+
+            val selectionCompleted = rectangleSelector.onEvent(
+                action = e.actionMasked,
+                pointerCount = e.pointerCount,
+                x0 = e.getX(0),
+                y0 = e.getY(0),
+                x1 = if (e.pointerCount > 1) e.getX(1) else e.getX(0),
+                y1 = if (e.pointerCount > 1) e.getY(1) else e.getY(0)
+            )
+
+            if (selectionCompleted) {
+                performRectangleZoom(rectangleSelector.completedRect)
+            }
+
+            //Start the hold timer when two fingers land; cancel it as soon as the
+            //selector leaves the hold-pending state (pinch, lift, cancel, activation)
+            if (e.actionMasked == MotionEvent.ACTION_POINTER_DOWN && e.pointerCount == 2) {
+                startRectangleHoldTimer()
+            } else if (!rectangleSelector.isHoldPending) {
+                holdJob?.cancel()
+                holdJob = null
+            }
+
+            //Update the rectangle selection preview overlay
+            if (rectangleSelector.previewVisible) {
+                showAreaZoomPreview(rectangleSelector.previewRect)
+            } else if (viewBinding.areaZoomPreviewView.visibility != View.GONE) {
+                hideAreaZoomPreview()
+            }
 
             //Consume the second tap of a double-tap used for page navigation so the
             //subsampling view does not also perform its zoom
@@ -258,6 +311,13 @@ class BookViewerPageFragment :
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> consumeDoubleTap = false
                 }
 
+                true
+            } else if (rectangleSelector.isSelecting) {
+                //Consume the gesture while the selection is active so the image
+                //view and the pager cannot zoom/pan/turn the page. The terminating
+                //ACTION_UP (which resets the selector) is NOT consumed: the image
+                //view needs it to reset its own gesture state (isZooming, isPanning,
+                //maxTouchCount). The pager is protected by its multi-touch guard.
                 true
             } else {
                 false
@@ -273,6 +333,107 @@ class BookViewerPageFragment :
      * Is double-tap page navigation setting enabled
      */
     private var doubleTapPageNavEnabled = false
+
+    /**
+     * Max pointer count of the current touch gesture.
+     * Used to suppress single-finger long-press while a two-finger gesture is active.
+     */
+    private var gestureMaxPointers = 1
+
+    /**
+     * Source image dimensions (source px) of the currently displayed page
+     */
+    private var sourceWidth = 0f
+    private var sourceHeight = 0f
+
+    private val rectangleSelector = TwoFingerRectangleSelector()
+
+    /**
+     * Pending hold timer which activates the rectangle selection
+     */
+    private var holdJob: Job? = null
+
+    /**
+     * Start the timer which activates the rectangle selection after the hold
+     * duration. The timer does not block or delay touch events sent to the
+     * image view - it only activates the selection when the fingers stayed still.
+     */
+    private fun startRectangleHoldTimer() {
+        holdJob?.cancel()
+
+        holdJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(RECTANGLE_HOLD_DURATION_MS)
+
+            rectangleSelector.enterSelecting()
+        }
+    }
+
+    /**
+     * Zoom so that the selected rectangle fills the viewport
+     * @param selection selection rectangle in view coordinates
+     */
+    private fun performRectangleZoom(selection: RectF) {
+        val siv = viewBinding.scaleImageView
+
+        if (!siv.isReady) {
+            return
+        }
+
+        val center = siv.center ?: return
+
+        val target = RectangleZoomCalculator.calculate(
+            selection = selection,
+            viewWidth = siv.width.toFloat(),
+            viewHeight = siv.height.toFloat(),
+            sourceWidth = sourceWidth,
+            sourceHeight = sourceHeight,
+            currentScale = siv.scale,
+            centerSourceX = center.x,
+            centerSourceY = center.y,
+            minScale = siv.minScale,
+            maxScale = siv.maxScale
+        ) ?: return
+
+        //The bubble overlay is a min-scale overlay, dismiss it before zooming
+        if (objectImageHelper.isPageObjectVisible()) {
+            hideCurrentPageObject()
+        }
+
+        val targetCenter = PointF(target.centerX, target.centerY)
+
+        if (objectImageHelper.instantInteractions) {
+            siv.setScaleAndCenter(target.scale, targetCenter)
+        } else {
+            viewLifecycleOwner.lifecycleScope.launch {
+                siv.animateScaleAndCenterSuspended(target.scale, targetCenter)
+            }
+        }
+    }
+
+    /**
+     * Show/update the rectangle selection preview
+     * @param rect selection rectangle in view coordinates
+     */
+    private fun showAreaZoomPreview(rect: RectF) {
+        val preview = viewBinding.areaZoomPreviewView
+
+        if (preview.visibility != View.VISIBLE) {
+            preview.visibility = View.VISIBLE
+        }
+
+        val params = preview.layoutParams as FrameLayout.LayoutParams
+
+        params.width = rect.width().roundToInt()
+        params.height = rect.height().roundToInt()
+        params.leftMargin = rect.left.roundToInt()
+        params.topMargin = rect.top.roundToInt()
+
+        preview.layoutParams = params
+    }
+
+    private fun hideAreaZoomPreview() {
+        viewBinding.areaZoomPreviewView.visibility = View.GONE
+    }
 
     private var snackbar: Snackbar? = null
 
@@ -441,6 +602,8 @@ class BookViewerPageFragment :
                 if (pageState is EncodedPageState.Loaded) {
                     whenStarted {
                         pageState.pageData.img.borrowedObject().apply {
+                            sourceWidth = width.toFloat()
+                            sourceHeight = height.toFloat()
                             viewer.showPage(
                                 PageViewer.PageSrc(path, position, width, height)
                             )
@@ -778,6 +941,11 @@ class BookViewerPageFragment :
          * The subsampling view scale can drift slightly from the exact min scale value.
          */
         private const val DOUBLE_TAP_NAV_SCALE_TOLERANCE = 0.01f
+
+        /**
+         * Hold duration before a two-finger gesture activates rectangle selection
+         */
+        private const val RECTANGLE_HOLD_DURATION_MS = 150L
 
         private val Bundle.isObjectWasVisible
             get() = getBoolean(STATE_OBJECT_WAS_VISIBLE)

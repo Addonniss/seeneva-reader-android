@@ -32,6 +32,7 @@ import app.seeneva.reader.logic.entity.ComicBookPage
 import org.tinylog.kotlin.Logger
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.properties.Delegates
 
 
@@ -147,12 +148,17 @@ class ViewerPager(
      */
     private val instantSwipeTouchListener = object : View.OnTouchListener {
         private var downX = Float.NaN
+        private var maxPointers = 1
 
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.x
+                    maxPointers = 1
                 }
+
+                MotionEvent.ACTION_POINTER_DOWN ->
+                    maxPointers = max(maxPointers, e.pointerCount)
 
                 MotionEvent.ACTION_MOVE -> {
                     if (downX.isNaN()) {
@@ -174,7 +180,8 @@ class ViewerPager(
                             itemCount = adapter.itemCount,
                             dx = dx,
                             width = pager.width,
-                            thresholdFraction = INSTANT_PAGE_TURN_THRESHOLD
+                            thresholdFraction = INSTANT_PAGE_TURN_THRESHOLD,
+                            multiTouch = maxPointers > 1
                         )?.also { target ->
                             // ViewPager2.setCurrentItem is unsafe inside the touch dispatch,
                             // so apply the page jump after the event is fully processed
@@ -189,6 +196,7 @@ class ViewerPager(
 
                 MotionEvent.ACTION_CANCEL -> {
                     downX = Float.NaN
+                    maxPointers = 1
 
                     return true
                 }
@@ -321,6 +329,8 @@ class ViewerPager(
          * @param dx horizontal swipe distance in pixels (negative = swipe left)
          * @param width pager width in pixels
          * @param thresholdFraction fraction of [width] the swipe must cover to turn the page
+         * @param multiTouch true when the gesture involved more than one pointer;
+         * such gestures (pinch, rectangle selection) must never turn the page
          * @return target physical page position or null if no page change should happen
          */
         internal fun instantPageTurnTarget(
@@ -328,9 +338,10 @@ class ViewerPager(
             itemCount: Int,
             dx: Float,
             width: Int,
-            thresholdFraction: Float
+            thresholdFraction: Float,
+            multiTouch: Boolean = false
         ): Int? {
-            if (itemCount <= 0 || width <= 0 || abs(dx) < width * thresholdFraction) {
+            if (multiTouch || itemCount <= 0 || width <= 0 || abs(dx) < width * thresholdFraction) {
                 return null
             }
 
