@@ -11,7 +11,7 @@
 
 ## Phase 2 — Advanced Zoom
 
-- [ ] Two-finger rectangular area zoom
+- [x] Two-finger rectangular area zoom (two-finger hold ~150ms activates a rectangle selection preview; movement before the hold completes is treated as a normal pinch; a slow pinch never activates the rectangle via a stillness window that restarts the hold timer; release zooms immediately through deferred execution so the subsampling view resets its gesture state first — pan/pinch work right after the zoom with no extra tap; the terminating ACTION_UP pointer-count fix prevents the selector from staying stuck; scaling is a geometry-based FIT/FILL hybrid: panels FIT completely with the longer edge governing and no crop, strips/page halves/bands FILL so they still zoom; ignores insignificant zooms and respects the Maximum Zoom limit; manually verified on the physical device by the Romanian user)
 - [ ] Instant zoom update on gesture release
 - [ ] Pinch-out / zoom-out behavior
 

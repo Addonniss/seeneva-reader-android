@@ -47,13 +47,89 @@ class RectangleZoomCalculatorTest {
     )
 
     @Test
-    fun leftHalfFillsViewport() {
+    fun leftHalfZoomsViaStripFallback() {
+        //The left half spans the full viewport height: a strip, FILL zoom
         val target = calculate(RectF(0f, 0f, 500f, 1400f))
 
         assertEquals(
             RectangleZoomCalculator.ZoomTarget(scale = 2.0f, centerX = 250f, centerY = 700f),
             target
         )
+    }
+
+    @Test
+    fun rightHalfZoomsViaStripFallback() {
+        //The right half spans the full viewport height: a strip, FILL zoom
+        val target = calculate(RectF(500f, 0f, 1000f, 1400f))
+
+        assertEquals(
+            RectangleZoomCalculator.ZoomTarget(scale = 2.0f, centerX = 750f, centerY = 700f),
+            target
+        )
+    }
+
+    @Test
+    fun topBandZoomsViaStripFallback() {
+        //A full-width band spans the whole viewport width: a strip, FILL zoom
+        val target = calculate(RectF(0f, 0f, 1000f, 400f))
+
+        assertEquals(
+            RectangleZoomCalculator.ZoomTarget(scale = 3.5f, centerX = 500f, centerY = 200f),
+            target
+        )
+    }
+
+    @Test
+    fun tallColumnZoomsViaStripFallback() {
+        //A tall column spans the full viewport height: a strip, FILL zoom
+        val target = calculate(RectF(400f, 0f, 600f, 1400f))
+
+        assertEquals(
+            RectangleZoomCalculator.ZoomTarget(scale = 5.0f, centerX = 500f, centerY = 700f),
+            target
+        )
+    }
+
+    @Test
+    fun widePanelFitsCompletely() {
+        //A wide panel is not a strip: FIT, the whole panel visible
+        val target = calculate(RectF(200f, 525f, 900f, 875f))
+
+        assertEquals(1.4286f, target!!.scale, 0.01f)
+        assertEquals(550f, target.centerX, 0.01f)
+        assertEquals(700f, target.centerY, 0.01f)
+    }
+
+    @Test
+    fun portraitPanelFitsCompletely() {
+        //A portrait panel is not a strip: FIT, the whole panel visible
+        val target = calculate(RectF(300f, 250f, 700f, 1150f))
+
+        assertEquals(1.5556f, target!!.scale, 0.01f)
+        assertEquals(500f, target.centerX, 0.01f)
+        assertEquals(700f, target.centerY, 0.01f)
+    }
+
+    @Test
+    fun largePanelUsesFitNotCrop() {
+        //A large panel at ~85% of the viewport width is still a panel: FIT is
+        //used (the whole panel visible) instead of FILL (which would crop)
+        val target = calculate(RectF(75f, 450f, 925f, 950f))
+
+        //Fit of the 850x500 selection = min(1000/850, 1400/500) = 1.176
+        assertEquals(1.1765f, target!!.scale, 0.01f)
+        assertEquals(500f, target.centerX, 0.01f)
+        assertEquals(700f, target.centerY, 0.01f)
+    }
+
+    @Test
+    fun stripBoundaryThreshold() {
+        //88% width: not a strip -> FIT, which is below the zoom gate -> no-op
+        assertNull(calculate(RectF(60f, 0f, 940f, 700f)))
+
+        //96% width: a strip -> FILL zoom
+        val strip = calculate(RectF(20f, 0f, 980f, 700f))
+        assertEquals(2.0f, strip!!.scale, 0.01f)
     }
 
     @Test
@@ -72,8 +148,8 @@ class RectangleZoomCalculatorTest {
         //Selection partially outside the image (letterbox margin)
         val target = calculate(RectF(-200f, -200f, 300f, 600f))
 
-        //Clamped source rect 300x600 -> fill = max(1000/300, 1400/600) = 3.333
-        assertEquals(3.333f, target!!.scale, 0.01f)
+        //Clamped source rect 300x600 -> fit = min(1000/300, 1400/600) = 2.333
+        assertEquals(2.333f, target!!.scale, 0.01f)
         assertEquals(150f, target.centerX, 0.01f)
         assertEquals(300f, target.centerY, 0.01f)
     }
